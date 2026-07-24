@@ -395,6 +395,34 @@ select:focus {
   width: 140px;
 }
 
+/* ---- Import ---- */
+.import-file-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.inline-label {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+.file-btn {
+  display: inline-block;
+  cursor: pointer;
+}
+.check-row {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+.check-row input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+}
+
 /* ---- Recurring ---- */
 .switch {
   display: inline-flex;

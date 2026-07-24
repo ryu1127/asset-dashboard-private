@@ -5,6 +5,7 @@ import Dashboard from "./pages/Dashboard";
 import Transactions from "./pages/Transactions";
 import Budget from "./pages/Budget";
 import Recurring from "./pages/Recurring";
+import Import from "./pages/Import";
 import Assets from "./pages/Assets";
 import Settings from "./pages/Settings";
 
@@ -44,6 +45,9 @@ export default function App() {
           <NavLink to="/recurring" className="nav-item">
             <span>🔁</span> 반복 거래
           </NavLink>
+          <NavLink to="/import" className="nav-item">
+            <span>📥</span> 가져오기
+          </NavLink>
           <NavLink to="/assets" className="nav-item">
             <span>💰</span> 자산 현황
           </NavLink>
@@ -61,6 +65,7 @@ export default function App() {
           <Route path="/transactions" element={<Transactions />} />
           <Route path="/budget" element={<Budget />} />
           <Route path="/recurring" element={<Recurring />} />
+          <Route path="/import" element={<Import />} />
           <Route path="/assets" element={<Assets />} />
           <Route path="/settings" element={<Settings />} />
         </Routes>
