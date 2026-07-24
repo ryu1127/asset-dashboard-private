@@ -423,6 +423,19 @@ select:focus {
   accent-color: var(--primary);
 }
 
+.auto-badge {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #10b981;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  padding: 1px 6px;
+  border-radius: 10px;
+  vertical-align: middle;
+}
+
 /* ---- Recurring ---- */
 .switch {
   display: inline-flex;

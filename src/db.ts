@@ -50,6 +50,12 @@ export interface Budget {
   amount: number; // 매월 예산 한도
 }
 
+export interface CatRule {
+  id?: number;
+  keyword: string; // 적요에 이 키워드가 포함되면
+  categoryId: number; // 이 카테고리로 자동 분류
+}
+
 export interface Recurring {
   id?: number;
   memo: string; // 규칙 이름 겸 메모 (예: 월급, 넷플릭스)
@@ -73,6 +79,7 @@ export class AssetDB extends Dexie {
   snapshots!: Table<Snapshot, number>;
   budgets!: Table<Budget, number>;
   recurring!: Table<Recurring, number>;
+  catRules!: Table<CatRule, number>;
 
   constructor() {
     super("assetDashboard");
@@ -89,6 +96,9 @@ export class AssetDB extends Dexie {
     this.version(3).stores({
       recurring: "++id, active",
     });
+    this.version(4).stores({
+      catRules: "++id, keyword, categoryId",
+    });
   }
 }
 
@@ -104,6 +114,7 @@ export async function seedIfEmpty() {
     db.members,
     db.categories,
     db.accounts,
+    db.catRules,
     async () => {
       await db.members.bulkAdd([
         { name: "남편", color: "#2563eb" },
@@ -137,8 +148,76 @@ export async function seedIfEmpty() {
         { name: "급여 통장", type: "예금", owner: "공동" },
         { name: "투자 계좌", type: "투자", owner: "공동" },
       ]);
+
+      // 적요 키워드 → 카테고리 기본 규칙
+      const cats = await db.categories.toArray();
+      const nameToId = new Map(cats.map((c) => [c.name, c.id!]));
+      await db.catRules.bulkAdd(presetRules(nameToId));
     }
   );
+}
+
+// ---- 적요 키워드 자동 분류 규칙 ----
+const DEFAULT_RULE_PRESETS: Record<string, string[]> = {
+  식비: [
+    "스타벅스", "카페", "커피", "배달의민족", "배민", "요기요", "쿠팡이츠",
+    "맥도날드", "김밥", "식당", "편의점", "GS25", "CU", "세븐일레븐", "이디야",
+    "투썸",
+  ],
+  교통: [
+    "지하철", "버스", "택시", "카카오T", "코레일", "SRT", "주유", "하이패스",
+    "톨게이트", "GS칼텍스", "SK에너지",
+  ],
+  통신: ["SKT", "KT", "LGU", "유플러스", "알뜰폰"],
+  "주거/공과금": ["한국전력", "전기요금", "도시가스", "수도요금", "관리비"],
+  생활용품: ["이마트", "홈플러스", "롯데마트", "코스트코", "다이소"],
+  쇼핑: ["쿠팡", "11번가", "G마켓", "지마켓", "무신사", "올리브영", "네이버페이"],
+  "문화/여가": [
+    "넷플릭스", "유튜브", "왓챠", "티빙", "웨이브", "스포티파이", "CGV",
+    "메가박스", "롯데시네마", "멜론",
+  ],
+  "의료/건강": ["병원", "약국", "의원", "치과", "한의원"],
+  급여: ["급여", "월급"],
+};
+
+function presetRules(nameToId: Map<string, number>): CatRule[] {
+  const out: CatRule[] = [];
+  for (const [cat, keywords] of Object.entries(DEFAULT_RULE_PRESETS)) {
+    const id = nameToId.get(cat);
+    if (id == null) continue;
+    for (const k of keywords) out.push({ keyword: k, categoryId: id });
+  }
+  return out;
+}
+
+// 기존 사용자도 버튼으로 기본 규칙을 채울 수 있게 (중복 키워드는 건너뜀). 추가된 개수 반환
+export async function seedDefaultRules(): Promise<number> {
+  const cats = await db.categories.toArray();
+  const nameToId = new Map(cats.map((c) => [c.name, c.id!]));
+  const existing = new Set(
+    (await db.catRules.toArray()).map((r) => r.keyword.toLowerCase())
+  );
+  const toAdd = presetRules(nameToId).filter(
+    (r) => !existing.has(r.keyword.toLowerCase())
+  );
+  if (toAdd.length) await db.catRules.bulkAdd(toAdd);
+  return toAdd.length;
+}
+
+// 적요에서 가장 구체적인(긴) 키워드 규칙을 찾는다
+export function matchRule(
+  memo: string,
+  rules: CatRule[]
+): CatRule | undefined {
+  if (!memo) return undefined;
+  const m = memo.toLowerCase();
+  let best: CatRule | undefined;
+  for (const r of rules) {
+    if (m.includes(r.keyword.toLowerCase())) {
+      if (!best || r.keyword.length > best.keyword.length) best = r;
+    }
+  }
+  return best;
 }
 
 // ---- 백업(내보내기/가져오기) ----
@@ -153,6 +232,7 @@ export async function exportData(): Promise<string> {
     snapshots: await db.snapshots.toArray(),
     budgets: await db.budgets.toArray(),
     recurring: await db.recurring.toArray(),
+    catRules: await db.catRules.toArray(),
   };
   return JSON.stringify(data, null, 2);
 }
@@ -168,6 +248,7 @@ export async function importData(json: string) {
     db.snapshots,
     db.budgets,
     db.recurring,
+    db.catRules,
     async () => {
       await Promise.all([
         db.members.clear(),
@@ -177,6 +258,7 @@ export async function importData(json: string) {
         db.snapshots.clear(),
         db.budgets.clear(),
         db.recurring.clear(),
+        db.catRules.clear(),
       ]);
       if (data.members) await db.members.bulkAdd(data.members);
       if (data.categories) await db.categories.bulkAdd(data.categories);
@@ -185,6 +267,7 @@ export async function importData(json: string) {
       if (data.snapshots) await db.snapshots.bulkAdd(data.snapshots);
       if (data.budgets) await db.budgets.bulkAdd(data.budgets);
       if (data.recurring) await db.recurring.bulkAdd(data.recurring);
+      if (data.catRules) await db.catRules.bulkAdd(data.catRules);
     }
   );
 }

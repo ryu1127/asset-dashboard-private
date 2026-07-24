@@ -7,7 +7,7 @@ import {
   parseCSV,
   readFileText,
 } from "../csv";
-import { db, type Kind } from "../db";
+import { db, matchRule, type Kind } from "../db";
 import { won } from "../format";
 
 type AmountMode = "split" | "single";
@@ -18,6 +18,9 @@ interface ParsedRow {
   kind: Kind;
   amount: number;
   memo: string;
+  categoryId: number | null;
+  categoryName: string;
+  matched: boolean; // 키워드 규칙으로 자동 분류됨
   ok: boolean;
 }
 
@@ -26,6 +29,7 @@ const NONE = -1;
 export default function Import() {
   const members = useLiveQuery(() => db.members.toArray(), []);
   const categories = useLiveQuery(() => db.categories.toArray(), []);
+  const catRules = useLiveQuery(() => db.catRules.toArray(), []);
 
   const [encoding, setEncoding] = useState<Encoding>("auto");
   const [rows, setRows] = useState<string[][]>([]);
@@ -53,6 +57,11 @@ export default function Import() {
     () => (categories ?? []).filter((c) => c.kind === "지출"),
     [categories]
   );
+  const catInfo = useMemo(() => {
+    const m = new Map<number, { name: string; kind: Kind; color: string }>();
+    categories?.forEach((c) => m.set(c.id!, c));
+    return m;
+  }, [categories]);
 
   const headers = useMemo(() => {
     if (!rows.length) return [];
@@ -119,7 +128,32 @@ export default function Import() {
         amount = Math.abs(v);
       }
       const memo = memoCol >= 0 ? (r[memoCol] ?? "").trim() : "";
-      return { date, kind, amount, memo, ok: !!date && amount > 0 };
+
+      // 적요 키워드 규칙 매칭 (kind가 일치할 때만 적용), 실패 시 기본 분류
+      const rule = matchRule(memo, catRules ?? []);
+      let categoryId: number | null = null;
+      let matched = false;
+      if (rule && catInfo.get(rule.categoryId)?.kind === kind) {
+        categoryId = rule.categoryId;
+        matched = true;
+      } else if (kind === "수입" && incomeCat !== "") {
+        categoryId = Number(incomeCat);
+      } else if (kind === "지출" && expenseCat !== "") {
+        categoryId = Number(expenseCat);
+      }
+      const categoryName =
+        categoryId != null ? catInfo.get(categoryId)?.name ?? "" : "미지정";
+
+      return {
+        date,
+        kind,
+        amount,
+        memo,
+        categoryId,
+        categoryName,
+        matched,
+        ok: !!date && amount > 0 && categoryId != null,
+      };
     });
   }, [
     rows,
@@ -130,6 +164,10 @@ export default function Import() {
     depositCol,
     withdrawCol,
     amountCol,
+    catRules,
+    catInfo,
+    incomeCat,
+    expenseCat,
   ]);
 
   const stats = useMemo(() => {
@@ -139,10 +177,12 @@ export default function Import() {
     valid.forEach((p) =>
       p.kind === "수입" ? (income += p.amount) : (expense += p.amount)
     );
+    const autoMatched = valid.filter((p) => p.matched).length;
     return {
       total: parsedRows.length,
       valid: valid.length,
       skipped: parsedRows.length - valid.length,
+      autoMatched,
       income,
       expense,
     };
@@ -163,7 +203,7 @@ export default function Import() {
         kind: p.kind,
         amount: p.amount,
         memberId: Number(memberId),
-        categoryId: Number(p.kind === "수입" ? incomeCat : expenseCat),
+        categoryId: p.categoryId!,
         memo: p.memo || undefined,
       }))
     );
@@ -371,6 +411,7 @@ export default function Import() {
               <h3 style={{ margin: 0 }}>④ 미리보기</h3>
               <span className="muted">
                 총 {stats.total}행 · 유효 {stats.valid}건
+                {stats.autoMatched > 0 && ` · 자동분류 ${stats.autoMatched}건`}
                 {stats.skipped > 0 && ` · 제외 ${stats.skipped}건`}
               </span>
             </div>
@@ -389,6 +430,7 @@ export default function Import() {
                     <th>날짜</th>
                     <th>구분</th>
                     <th>메모</th>
+                    <th>분류</th>
                     <th className="right">금액</th>
                     <th></th>
                   </tr>
@@ -401,6 +443,19 @@ export default function Import() {
                         {p.kind}
                       </td>
                       <td className="muted">{p.memo}</td>
+                      <td>
+                        {p.categoryId != null && (
+                          <span
+                            className="dot"
+                            style={{
+                              background:
+                                catInfo.get(p.categoryId)?.color ?? "#94a3b8",
+                            }}
+                          />
+                        )}
+                        {p.categoryName}
+                        {p.matched && <span className="auto-badge">자동</span>}
+                      </td>
                       <td
                         className={
                           "right " + (p.kind === "수입" ? "income" : "expense")

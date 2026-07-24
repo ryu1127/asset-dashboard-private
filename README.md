@@ -18,6 +18,8 @@
   밀린 달까지 자동으로 기록(중복 없음).
 - 📥 **CSV 가져오기** — 은행·카드사 CSV를 불러와 거래로 일괄 등록. EUC-KR 자동
   감지, 입금/출금 분리 컬럼, 다양한 날짜 형식 지원. 컬럼 연결 → 미리보기 → 가져오기.
+- 🔎 **적요 자동 분류** — 거래 내용(적요) 키워드로 카테고리 자동 배정(예: 스타벅스
+  → 식비). 기본 규칙 내장, 설정에서 규칙 추가·수정 가능.
 - 💰 **자산 현황** — 월별 계좌 잔액을 입력해 순자산(투자·예금 포함) 추이 기록.
 - 💾 **백업** — JSON 내보내기/가져오기로 백업하거나 다른 PC로 이전.
 
@@ -59,6 +61,7 @@ npm run preview  # 빌드 결과 미리보기
 | `snapshots` | month, accountId, balance |
 | `budgets` | categoryId, amount(월 예산 한도) |
 | `recurring` | memo, kind, amount, memberId, categoryId, dayOfMonth, startMonth, active, lastPostedMonth |
+| `catRules` | keyword, categoryId (적요 키워드 자동 분류) |
 
 ### 기술 스택
 
@@ -69,6 +72,5 @@ npm run preview  # 빌드 결과 미리보기
 
 ## 향후 확장 아이디어
 
-- CSV 가져오기 시 규칙 기반 카테고리 자동 분류(적요 키워드 매칭)
 - 클라우드 동기화(Supabase 등)로 여러 기기 실시간 공유
   — 현재 백업 JSON 구조가 그대로 마이그레이션 가능하도록 설계됨

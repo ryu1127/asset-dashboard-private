@@ -4,6 +4,7 @@ import {
   db,
   exportData,
   importData,
+  seedDefaultRules,
   type AccountType,
 } from "../db";
 
@@ -20,6 +21,7 @@ export default function Settings() {
   const members = useLiveQuery(() => db.members.toArray(), []);
   const accounts = useLiveQuery(() => db.accounts.toArray(), []);
   const categories = useLiveQuery(() => db.categories.toArray(), []);
+  const catRules = useLiveQuery(() => db.catRules.toArray(), []);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [newAccName, setNewAccName] = useState("");
@@ -27,6 +29,10 @@ export default function Settings() {
   const [newAccOwner, setNewAccOwner] = useState("공동");
   const [newCatName, setNewCatName] = useState("");
   const [newCatKind, setNewCatKind] = useState<"수입" | "지출">("지출");
+  const [newRuleKeyword, setNewRuleKeyword] = useState("");
+  const [newRuleCat, setNewRuleCat] = useState<number | "">("");
+
+  const catNameMap = new Map(categories?.map((c) => [c.id!, c]) ?? []);
 
   async function doExport() {
     const json = await exportData();
@@ -235,6 +241,87 @@ export default function Settings() {
                 color: palette[Math.floor(Math.random() * palette.length)],
               });
               setNewCatName("");
+            }}
+          >
+            추가
+          </button>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="asset-head">
+          <h3>🔎 적요 자동 분류 규칙</h3>
+          <button
+            className="btn-secondary"
+            onClick={async () => {
+              const n = await seedDefaultRules();
+              alert(
+                n > 0
+                  ? `기본 규칙 ${n}개를 추가했습니다.`
+                  : "추가할 새 기본 규칙이 없습니다."
+              );
+            }}
+          >
+            기본 규칙 채우기
+          </button>
+        </div>
+        <p className="muted">
+          CSV 가져오기 시 거래 내용(적요)에 아래 키워드가 포함되면 지정한 분류로
+          자동 배정됩니다. 예: 「스타벅스」 → 식비.
+        </p>
+        <div className="tag-list" style={{ marginTop: 12 }}>
+          {catRules?.length === 0 && (
+            <span className="muted">
+              규칙이 없습니다. 「기본 규칙 채우기」를 눌러 보세요.
+            </span>
+          )}
+          {catRules?.map((r) => {
+            const cat = catNameMap.get(r.categoryId);
+            return (
+              <span key={r.id} className="cat-tag">
+                <b>{r.keyword}</b>
+                <span className="muted">→</span>
+                <span className="dot" style={{ background: cat?.color ?? "#94a3b8" }} />
+                {cat?.name ?? "삭제된 분류"}
+                <button
+                  className="del sm"
+                  onClick={() => db.catRules.delete(r.id!)}
+                >
+                  ✕
+                </button>
+              </span>
+            );
+          })}
+        </div>
+        <div className="add-row">
+          <input
+            placeholder="키워드 (예: 스타벅스)"
+            value={newRuleKeyword}
+            onChange={(e) => setNewRuleKeyword(e.target.value)}
+          />
+          <select
+            value={newRuleCat}
+            onChange={(e) =>
+              setNewRuleCat(e.target.value === "" ? "" : Number(e.target.value))
+            }
+          >
+            <option value="">분류 선택</option>
+            {categories?.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name} ({c.kind})
+              </option>
+            ))}
+          </select>
+          <button
+            className="btn-secondary"
+            onClick={async () => {
+              if (!newRuleKeyword.trim() || newRuleCat === "") return;
+              await db.catRules.add({
+                keyword: newRuleKeyword.trim(),
+                categoryId: Number(newRuleCat),
+              });
+              setNewRuleKeyword("");
+              setNewRuleCat("");
             }}
           >
             추가
