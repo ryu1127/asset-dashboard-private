@@ -43,6 +43,12 @@ export interface Snapshot {
   balance: number;
 }
 
+export interface Budget {
+  id?: number;
+  categoryId: number; // 지출 카테고리
+  amount: number; // 매월 예산 한도
+}
+
 // ---- Dexie DB ----
 export class AssetDB extends Dexie {
   members!: Table<Member, number>;
@@ -50,6 +56,7 @@ export class AssetDB extends Dexie {
   accounts!: Table<Account, number>;
   transactions!: Table<Transaction, number>;
   snapshots!: Table<Snapshot, number>;
+  budgets!: Table<Budget, number>;
 
   constructor() {
     super("assetDashboard");
@@ -59,6 +66,9 @@ export class AssetDB extends Dexie {
       accounts: "++id, name, type, owner",
       transactions: "++id, date, kind, memberId, categoryId, accountId",
       snapshots: "++id, month, accountId",
+    });
+    this.version(2).stores({
+      budgets: "++id, categoryId",
     });
   }
 }
@@ -122,6 +132,7 @@ export async function exportData(): Promise<string> {
     accounts: await db.accounts.toArray(),
     transactions: await db.transactions.toArray(),
     snapshots: await db.snapshots.toArray(),
+    budgets: await db.budgets.toArray(),
   };
   return JSON.stringify(data, null, 2);
 }
@@ -135,6 +146,7 @@ export async function importData(json: string) {
     db.accounts,
     db.transactions,
     db.snapshots,
+    db.budgets,
     async () => {
       await Promise.all([
         db.members.clear(),
@@ -142,12 +154,14 @@ export async function importData(json: string) {
         db.accounts.clear(),
         db.transactions.clear(),
         db.snapshots.clear(),
+        db.budgets.clear(),
       ]);
       if (data.members) await db.members.bulkAdd(data.members);
       if (data.categories) await db.categories.bulkAdd(data.categories);
       if (data.accounts) await db.accounts.bulkAdd(data.accounts);
       if (data.transactions) await db.transactions.bulkAdd(data.transactions);
       if (data.snapshots) await db.snapshots.bulkAdd(data.snapshots);
+      if (data.budgets) await db.budgets.bulkAdd(data.budgets);
     }
   );
 }

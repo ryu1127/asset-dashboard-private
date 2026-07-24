@@ -395,6 +395,40 @@ select:focus {
   width: 140px;
 }
 
+/* ---- Budget ---- */
+.progress {
+  background: #eef0f2;
+  border-radius: 999px;
+  height: 9px;
+  overflow: hidden;
+  width: 100%;
+}
+.progress.lg {
+  height: 14px;
+}
+.progress-fill {
+  height: 100%;
+  background: var(--primary);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+.progress-fill.over {
+  background: var(--expense);
+}
+.budget-bar-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.budget-table td {
+  vertical-align: middle;
+}
+.budget-input {
+  width: 130px;
+}
+
 /* ---- Settings ---- */
 .tag-list {
   display: flex;

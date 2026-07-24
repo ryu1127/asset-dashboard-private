@@ -3,6 +3,7 @@ import { NavLink, Navigate, Route, Routes } from "react-router-dom";
 import { seedIfEmpty } from "./db";
 import Dashboard from "./pages/Dashboard";
 import Transactions from "./pages/Transactions";
+import Budget from "./pages/Budget";
 import Assets from "./pages/Assets";
 import Settings from "./pages/Settings";
 
@@ -34,6 +35,9 @@ export default function App() {
           <NavLink to="/transactions" className="nav-item">
             <span>✏️</span> 거래 입력
           </NavLink>
+          <NavLink to="/budget" className="nav-item">
+            <span>🎯</span> 예산
+          </NavLink>
           <NavLink to="/assets" className="nav-item">
             <span>💰</span> 자산 현황
           </NavLink>
@@ -49,6 +53,7 @@ export default function App() {
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/transactions" element={<Transactions />} />
+          <Route path="/budget" element={<Budget />} />
           <Route path="/assets" element={<Assets />} />
           <Route path="/settings" element={<Settings />} />
         </Routes>
