@@ -42,3 +42,16 @@ export function monthLabel(ym: string): string {
   const [, m] = ym.split("-");
   return `${parseInt(m, 10)}월`;
 }
+
+// 다음 달의 YYYY-MM
+export function nextMonth(ym: string): string {
+  const [y, m] = ym.split("-").map(Number);
+  const d = new Date(y, m, 1); // m(1-based)을 넘기면 다음 달 1일
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+// 해당 월의 일수
+export function daysInMonth(ym: string): number {
+  const [y, m] = ym.split("-").map(Number);
+  return new Date(y, m, 0).getDate();
+}

@@ -1,4 +1,5 @@
 import Dexie, { type Table } from "dexie";
+import { currentMonth, daysInMonth, nextMonth } from "./format";
 
 // ---- 타입 정의 ----
 export type Kind = "수입" | "지출";
@@ -49,6 +50,20 @@ export interface Budget {
   amount: number; // 매월 예산 한도
 }
 
+export interface Recurring {
+  id?: number;
+  memo: string; // 규칙 이름 겸 메모 (예: 월급, 넷플릭스)
+  kind: Kind;
+  amount: number;
+  memberId: number;
+  categoryId: number;
+  accountId?: number;
+  dayOfMonth: number; // 매월 며칠에 반영할지 (1~31, 말일 초과 시 그 달 마지막 날)
+  startMonth: string; // YYYY-MM, 시작 월
+  active: boolean;
+  lastPostedMonth?: string; // 마지막으로 생성된 월 (중복 방지)
+}
+
 // ---- Dexie DB ----
 export class AssetDB extends Dexie {
   members!: Table<Member, number>;
@@ -57,6 +72,7 @@ export class AssetDB extends Dexie {
   transactions!: Table<Transaction, number>;
   snapshots!: Table<Snapshot, number>;
   budgets!: Table<Budget, number>;
+  recurring!: Table<Recurring, number>;
 
   constructor() {
     super("assetDashboard");
@@ -69,6 +85,9 @@ export class AssetDB extends Dexie {
     });
     this.version(2).stores({
       budgets: "++id, categoryId",
+    });
+    this.version(3).stores({
+      recurring: "++id, active",
     });
   }
 }
@@ -133,6 +152,7 @@ export async function exportData(): Promise<string> {
     transactions: await db.transactions.toArray(),
     snapshots: await db.snapshots.toArray(),
     budgets: await db.budgets.toArray(),
+    recurring: await db.recurring.toArray(),
   };
   return JSON.stringify(data, null, 2);
 }
@@ -147,6 +167,7 @@ export async function importData(json: string) {
     db.transactions,
     db.snapshots,
     db.budgets,
+    db.recurring,
     async () => {
       await Promise.all([
         db.members.clear(),
@@ -155,6 +176,7 @@ export async function importData(json: string) {
         db.transactions.clear(),
         db.snapshots.clear(),
         db.budgets.clear(),
+        db.recurring.clear(),
       ]);
       if (data.members) await db.members.bulkAdd(data.members);
       if (data.categories) await db.categories.bulkAdd(data.categories);
@@ -162,6 +184,46 @@ export async function importData(json: string) {
       if (data.transactions) await db.transactions.bulkAdd(data.transactions);
       if (data.snapshots) await db.snapshots.bulkAdd(data.snapshots);
       if (data.budgets) await db.budgets.bulkAdd(data.budgets);
+      if (data.recurring) await db.recurring.bulkAdd(data.recurring);
     }
   );
+}
+
+// ---- 반복 거래: 밀린 달까지 자동 생성 (중복 방지) ----
+// 각 활성 규칙에 대해 시작월(또는 마지막 생성월 다음)부터 이번 달까지
+// 매월 한 건씩 거래를 만들고 lastPostedMonth 를 갱신한다. 반환값은 생성 건수.
+export async function postDueRecurring(): Promise<number> {
+  const cm = currentMonth();
+  const rules = await db.recurring.toArray();
+  let created = 0;
+
+  await db.transaction("rw", db.recurring, db.transactions, async () => {
+    for (const r of rules) {
+      if (!r.active) continue;
+      let m = r.lastPostedMonth ? nextMonth(r.lastPostedMonth) : r.startMonth;
+      let last = r.lastPostedMonth;
+      let guard = 0;
+      while (m <= cm && guard < 600) {
+        const day = Math.min(r.dayOfMonth, daysInMonth(m));
+        const date = `${m}-${String(day).padStart(2, "0")}`;
+        await db.transactions.add({
+          date,
+          kind: r.kind,
+          amount: r.amount,
+          memberId: r.memberId,
+          categoryId: r.categoryId,
+          accountId: r.accountId,
+          memo: r.memo,
+        });
+        created++;
+        last = m;
+        m = nextMonth(m);
+        guard++;
+      }
+      if (last !== r.lastPostedMonth) {
+        await db.recurring.update(r.id!, { lastPostedMonth: last });
+      }
+    }
+  });
+  return created;
 }

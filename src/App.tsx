@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { NavLink, Navigate, Route, Routes } from "react-router-dom";
-import { seedIfEmpty } from "./db";
+import { postDueRecurring, seedIfEmpty } from "./db";
 import Dashboard from "./pages/Dashboard";
 import Transactions from "./pages/Transactions";
 import Budget from "./pages/Budget";
+import Recurring from "./pages/Recurring";
 import Assets from "./pages/Assets";
 import Settings from "./pages/Settings";
 
@@ -11,7 +12,9 @@ export default function App() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    seedIfEmpty().finally(() => setReady(true));
+    seedIfEmpty()
+      .then(() => postDueRecurring())
+      .finally(() => setReady(true));
   }, []);
 
   if (!ready) {
@@ -38,6 +41,9 @@ export default function App() {
           <NavLink to="/budget" className="nav-item">
             <span>🎯</span> 예산
           </NavLink>
+          <NavLink to="/recurring" className="nav-item">
+            <span>🔁</span> 반복 거래
+          </NavLink>
           <NavLink to="/assets" className="nav-item">
             <span>💰</span> 자산 현황
           </NavLink>
@@ -54,6 +60,7 @@ export default function App() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/transactions" element={<Transactions />} />
           <Route path="/budget" element={<Budget />} />
+          <Route path="/recurring" element={<Recurring />} />
           <Route path="/assets" element={<Assets />} />
           <Route path="/settings" element={<Settings />} />
         </Routes>

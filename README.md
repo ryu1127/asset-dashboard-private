@@ -14,6 +14,8 @@
   카테고리별 지출, 구성원별 비교, 누적 저축 추이.
 - 🎯 **예산 관리** — 카테고리별 월 예산을 정하고, 실제 지출 대비 소진율을
   진행 바로 확인. 초과 시 빨간색 경고.
+- 🔁 **반복 거래** — 월급·구독료처럼 매월 반복되는 항목을 등록하면 앱을 열 때
+  밀린 달까지 자동으로 기록(중복 없음).
 - 💰 **자산 현황** — 월별 계좌 잔액을 입력해 순자산(투자·예금 포함) 추이 기록.
 - 💾 **백업** — JSON 내보내기/가져오기로 백업하거나 다른 PC로 이전.
 
@@ -54,6 +56,7 @@ npm run preview  # 빌드 결과 미리보기
 | `transactions` | date, kind, amount, memberId, categoryId, accountId, memo |
 | `snapshots` | month, accountId, balance |
 | `budgets` | categoryId, amount(월 예산 한도) |
+| `recurring` | memo, kind, amount, memberId, categoryId, dayOfMonth, startMonth, active, lastPostedMonth |
 
 ### 기술 스택
 
@@ -64,7 +67,6 @@ npm run preview  # 빌드 결과 미리보기
 
 ## 향후 확장 아이디어
 
-- 반복 거래(월급·구독료) 자동 입력
 - CSV / 은행 내역 가져오기
 - 클라우드 동기화(Supabase 등)로 여러 기기 실시간 공유
   — 현재 백업 JSON 구조가 그대로 마이그레이션 가능하도록 설계됨
