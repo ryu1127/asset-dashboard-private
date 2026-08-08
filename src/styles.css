@@ -616,6 +616,31 @@ select:focus {
   font-weight: 600;
 }
 
+/* ---- Top drive bar (visible on every page) ---- */
+.drive-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 14px;
+  margin-bottom: 20px;
+  font-size: 13px;
+}
+.drive-bar-icon {
+  font-size: 15px;
+}
+.drive-bar-status {
+  color: var(--muted);
+  margin-left: auto;
+}
+.drive-bar-status.stale {
+  color: var(--expense);
+  font-weight: 600;
+}
+
 /* ---- Category blocks ---- */
 .cat-kind-section {
   margin-bottom: 18px;

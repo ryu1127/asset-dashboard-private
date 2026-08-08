@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { NavLink, Navigate, Route, Routes } from "react-router-dom";
 import { postDueRecurring, seedIfEmpty } from "./db";
+import DriveBar from "./components/DriveBar";
 import Dashboard from "./pages/Dashboard";
 import Transactions from "./pages/Transactions";
 import Budget from "./pages/Budget";
@@ -85,6 +86,7 @@ export default function App() {
       )}
 
       <main className="content">
+        <DriveBar />
         <Routes>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<Dashboard />} />
