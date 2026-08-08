@@ -42,7 +42,10 @@ function AddChildCategory({ parentId, kind }: { parentId: number; kind: Kind }) 
         value={val}
         onChange={(e) => setVal(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === "Enter") {
+          // 한글 등 IME로 조합 중일 때 Enter를 누르면 "조합 확정"과 "제출"
+          // 두 번의 keydown이 잡혀 두 번 추가되는 버그가 있어, 조합 중에는
+          // 무시한다.
+          if (e.key === "Enter" && !e.nativeEvent.isComposing) {
             e.preventDefault();
             submit();
           }
@@ -120,7 +123,7 @@ function RuleChips({ categoryId, rules }: { categoryId: number; rules: CatRule[]
           value={val}
           onChange={(e) => setVal(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter") {
+            if (e.key === "Enter" && !e.nativeEvent.isComposing) {
               e.preventDefault();
               submit();
             }
