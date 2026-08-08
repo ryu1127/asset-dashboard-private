@@ -529,48 +529,69 @@ select:focus {
   min-width: 160px;
 }
 
-/* ---- Category tree ---- */
-.cat-tree {
+/* ---- Category blocks ---- */
+.cat-block {
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 10px 12px;
   margin-bottom: 8px;
 }
-.cat-tree-head {
+.cat-block-sub {
+  margin: 8px 0 0 20px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+}
+.cat-block-head {
   display: flex;
   align-items: center;
   gap: 8px;
-  cursor: pointer;
-  list-style: none;
 }
-.cat-tree-head::-webkit-details-marker {
-  display: none;
-}
-.cat-tree-head::before {
-  content: "▸";
+.cat-block-head.sub {
+  font-size: 13px;
   color: var(--muted);
-  font-size: 11px;
-  margin-right: 2px;
 }
-.cat-tree[open] > .cat-tree-head::before {
-  content: "▾";
-}
-.cat-tree-head .del.sm {
+.cat-block-head .del.sm {
   margin-left: auto;
 }
-.cat-tree-body {
+.cat-block-body {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
-  margin: 10px 0 2px 22px;
+  margin-top: 10px;
 }
 .child-row {
   gap: 6px;
+}
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0 2px;
+}
+.link-btn:hover {
+  text-decoration: underline;
 }
 .parent-select {
   font-size: 12px;
   padding: 4px 6px;
   border-radius: 6px;
+}
+.inline-add {
+  display: inline-flex;
+  gap: 4px;
+}
+.inline-add input {
+  font-size: 12px;
+  padding: 5px 8px;
+  width: 110px;
+  border-radius: 6px;
+}
+.btn-secondary.sm {
+  padding: 5px 10px;
+  font-size: 12px;
 }
 
 /* ---- Budget grouped rows ---- */

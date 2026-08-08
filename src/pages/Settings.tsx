@@ -1,11 +1,14 @@
 import { useLiveQuery } from "dexie-react-hooks";
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   db,
   exportData,
   importData,
   seedDefaultRules,
   type AccountType,
+  type CatRule,
+  type Category,
+  type Kind,
 } from "../db";
 import {
   downloadFromDrive,
@@ -14,7 +17,120 @@ import {
   uploadToDrive,
 } from "../drive";
 import { groupCategories } from "../categoryTree";
-import CategorySelectOptions from "../components/CategorySelectOptions";
+
+const PALETTE = ["#ef4444", "#f97316", "#22c55e", "#06b6d4", "#8b5cf6", "#ec4899"];
+
+// 하위 카테고리를 그 자리에서 바로 추가하는 작은 인라인 입력
+function AddChildCategory({ parentId, kind }: { parentId: number; kind: Kind }) {
+  const [val, setVal] = useState("");
+  async function submit() {
+    if (!val.trim()) return;
+    await db.categories.add({
+      name: val.trim(),
+      kind,
+      color: PALETTE[Math.floor(Math.random() * PALETTE.length)],
+      parentId,
+    });
+    setVal("");
+  }
+  return (
+    <span className="inline-add">
+      <input
+        placeholder="+ 하위 카테고리"
+        value={val}
+        onChange={(e) => setVal(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            submit();
+          }
+        }}
+      />
+      <button className="btn-secondary sm" onClick={submit}>
+        추가
+      </button>
+    </span>
+  );
+}
+
+// 평소엔 작은 "이동" 링크만 보이다가, 클릭하면 그 자리에서 상위 카테고리
+// 선택창이 나타나는 방식. 데이터(거래 내역)를 잃지 않고 재배치할 때만 사용.
+function MoveCategory({
+  cat,
+  options,
+}: {
+  cat: Category;
+  options: Category[];
+}) {
+  const [open, setOpen] = useState(false);
+  if (!open) {
+    return (
+      <button className="link-btn" onClick={() => setOpen(true)}>
+        이동
+      </button>
+    );
+  }
+  return (
+    <select
+      autoFocus
+      className="parent-select"
+      value={cat.parentId ?? ""}
+      onChange={(e) => {
+        const v = e.target.value;
+        db.categories.update(cat.id!, {
+          parentId: v === "" ? undefined : Number(v),
+        });
+        setOpen(false);
+      }}
+      onBlur={() => setOpen(false)}
+    >
+      <option value="">최상위로</option>
+      {options.map((p) => (
+        <option key={p.id} value={p.id}>
+          「{p.name}」 하위로
+        </option>
+      ))}
+    </select>
+  );
+}
+
+// 카테고리 하나에 연결된 적요 키워드 목록 + 그 자리에서 바로 추가하는 입력
+function RuleChips({ categoryId, rules }: { categoryId: number; rules: CatRule[] }) {
+  const [val, setVal] = useState("");
+  async function submit() {
+    if (!val.trim()) return;
+    await db.catRules.add({ keyword: val.trim(), categoryId });
+    setVal("");
+  }
+  return (
+    <div className="tag-list" style={{ marginTop: 8 }}>
+      {rules.map((r) => (
+        <span key={r.id} className="cat-tag">
+          {r.keyword}
+          <button className="del sm" onClick={() => db.catRules.delete(r.id!)}>
+            ✕
+          </button>
+        </span>
+      ))}
+      <span className="inline-add">
+        <input
+          placeholder="+ 키워드"
+          value={val}
+          onChange={(e) => setVal(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              submit();
+            }
+          }}
+        />
+        <button className="btn-secondary sm" onClick={submit}>
+          추가
+        </button>
+      </span>
+    </div>
+  );
+}
 
 const ACCOUNT_TYPES: AccountType[] = [
   "현금",
@@ -37,13 +153,26 @@ export default function Settings() {
   const [newAccOwner, setNewAccOwner] = useState("공동");
   const [newCatName, setNewCatName] = useState("");
   const [newCatKind, setNewCatKind] = useState<"수입" | "지출">("지출");
-  const [newCatParentId, setNewCatParentId] = useState<number | "">("");
-  const [newRuleKeyword, setNewRuleKeyword] = useState("");
-  const [newRuleCat, setNewRuleCat] = useState<number | "">("");
   const [driveConnected, setDriveConnected] = useState(isSignedIn());
   const [driveBusy, setDriveBusy] = useState(false);
 
-  const catNameMap = new Map(categories?.map((c) => [c.id!, c]) ?? []);
+  const rulesByCategory = useMemo(() => {
+    const m = new Map<number, CatRule[]>();
+    catRules?.forEach((r) => {
+      const arr = m.get(r.categoryId) ?? [];
+      arr.push(r);
+      m.set(r.categoryId, arr);
+    });
+    return m;
+  }, [catRules]);
+
+  const orphanRules = useMemo(
+    () =>
+      (catRules ?? []).filter(
+        (r) => !categories?.some((c) => c.id === r.categoryId)
+      ),
+    [catRules, categories]
+  );
 
   async function doExport() {
     const json = await exportData();
@@ -290,40 +419,21 @@ export default function Settings() {
       <div className="card">
         <h3>🏷️ 분류 카테고리</h3>
         <p className="muted">
-          카테고리 아래에 하위 카테고리를 만들 수 있어요. 예: 「급여」 아래
-          「월급」·「상여/보너스」. 하위 카테고리가 없는 항목은 옆의 선택창으로
-          다른 카테고리 아래로 옮길 수 있습니다.
+          각 카테고리 아래에서 하위 카테고리를 바로 추가·삭제하세요. 예: 「급여」
+          아래 「월급」·「상여/보너스」.
         </p>
         {groupCategories(categories ?? []).map((g) => {
           const topLevelSameKind = (categories ?? []).filter(
-            (c) => !c.parentId && c.kind === g.parent.kind
+            (c) => !c.parentId && c.kind === g.parent.kind && c.id !== g.parent.id
           );
           return (
-            <details key={g.parent.id} className="cat-tree" open>
-              <summary className="cat-tree-head">
+            <div key={g.parent.id} className="cat-block">
+              <div className="cat-block-head">
                 <span className="dot" style={{ background: g.parent.color }} />
                 <b>{g.parent.name}</b>
                 <span className="muted">({g.parent.kind})</span>
                 {g.children.length === 0 && (
-                  <select
-                    className="parent-select"
-                    value=""
-                    onChange={(e) => {
-                      if (e.target.value === "") return;
-                      db.categories.update(g.parent.id!, {
-                        parentId: Number(e.target.value),
-                      });
-                    }}
-                  >
-                    <option value="">하위로 옮기기...</option>
-                    {topLevelSameKind
-                      .filter((p) => p.id !== g.parent.id)
-                      .map((p) => (
-                        <option key={p.id} value={p.id}>
-                          「{p.name}」 하위로
-                        </option>
-                      ))}
-                  </select>
+                  <MoveCategory cat={g.parent} options={topLevelSameKind} />
                 )}
                 <button
                   className="del sm"
@@ -340,77 +450,37 @@ export default function Settings() {
                 >
                   ✕
                 </button>
-              </summary>
-              {g.children.length > 0 && (
-                <div className="cat-tree-body">
-                  {g.children.map((c) => (
-                    <span key={c.id} className="cat-tag child-row">
-                      <span className="dot" style={{ background: c.color }} />
-                      {c.name}
-                      <select
-                        className="parent-select"
-                        value={c.parentId ?? ""}
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          db.categories.update(c.id!, {
-                            parentId: v === "" ? undefined : Number(v),
-                          });
-                        }}
-                      >
-                        <option value="">최상위로</option>
-                        {topLevelSameKind
-                          .filter((p) => p.id !== c.id)
-                          .map((p) => (
-                            <option key={p.id} value={p.id}>
-                              「{p.name}」 하위로
-                            </option>
-                          ))}
-                      </select>
-                      <button
-                        className="del sm"
-                        onClick={() =>
-                          confirm(`「${c.name}」 분류를 삭제할까요?`) &&
-                          db.categories.delete(c.id!)
-                        }
-                      >
-                        ✕
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
-            </details>
+              </div>
+              <div className="cat-block-body">
+                {g.children.map((c) => (
+                  <span key={c.id} className="cat-tag child-row">
+                    <span className="dot" style={{ background: c.color }} />
+                    {c.name}
+                    <MoveCategory cat={c} options={topLevelSameKind} />
+                    <button
+                      className="del sm"
+                      onClick={() =>
+                        confirm(`「${c.name}」 분류를 삭제할까요?`) &&
+                        db.categories.delete(c.id!)
+                      }
+                    >
+                      ✕
+                    </button>
+                  </span>
+                ))}
+                <AddChildCategory parentId={g.parent.id!} kind={g.parent.kind} />
+              </div>
+            </div>
           );
         })}
         <div className="add-row">
           <input
-            placeholder="분류 이름"
+            placeholder="새 최상위 카테고리 이름"
             value={newCatName}
             onChange={(e) => setNewCatName(e.target.value)}
           />
           <select
-            value={newCatParentId}
-            onChange={(e) => {
-              const v = e.target.value;
-              setNewCatParentId(v === "" ? "" : Number(v));
-              if (v !== "") {
-                const p = categories?.find((c) => c.id === Number(v));
-                if (p) setNewCatKind(p.kind);
-              }
-            }}
-          >
-            <option value="">최상위 카테고리로 추가</option>
-            {(categories ?? [])
-              .filter((c) => !c.parentId)
-              .map((p) => (
-                <option key={p.id} value={p.id}>
-                  「{p.name}」 하위로 추가
-                </option>
-              ))}
-          </select>
-          <select
             value={newCatKind}
-            disabled={newCatParentId !== ""}
             onChange={(e) => setNewCatKind(e.target.value as "수입" | "지출")}
           >
             <option value="지출">지출</option>
@@ -420,15 +490,12 @@ export default function Settings() {
             className="btn-secondary"
             onClick={async () => {
               if (!newCatName.trim()) return;
-              const palette = ["#ef4444", "#f97316", "#22c55e", "#06b6d4", "#8b5cf6", "#ec4899"];
               await db.categories.add({
                 name: newCatName.trim(),
                 kind: newCatKind,
-                color: palette[Math.floor(Math.random() * palette.length)],
-                parentId: newCatParentId === "" ? undefined : newCatParentId,
+                color: PALETTE[Math.floor(Math.random() * PALETTE.length)],
               });
               setNewCatName("");
-              setNewCatParentId("");
             }}
           >
             추가
@@ -454,63 +521,57 @@ export default function Settings() {
           </button>
         </div>
         <p className="muted">
-          CSV 가져오기 시 거래 내용(적요)에 아래 키워드가 포함되면 지정한 분류로
-          자동 배정됩니다. 예: 「스타벅스」 → 식비.
+          CSV 가져오기 시 거래 내용(적요)에 아래 키워드가 포함되면 그 카테고리로
+          자동 배정됩니다. 카테고리별로 어떤 키워드가 연결되어 있는지 아래에서
+          바로 보고 추가·삭제하세요.
         </p>
-        <div className="tag-list" style={{ marginTop: 12 }}>
-          {catRules?.length === 0 && (
-            <span className="muted">
-              규칙이 없습니다. 「기본 규칙 채우기」를 눌러 보세요.
-            </span>
-          )}
-          {catRules?.map((r) => {
-            const cat = catNameMap.get(r.categoryId);
-            return (
-              <span key={r.id} className="cat-tag">
-                <b>{r.keyword}</b>
-                <span className="muted">→</span>
-                <span className="dot" style={{ background: cat?.color ?? "#94a3b8" }} />
-                {cat?.name ?? "삭제된 분류"}
-                <button
-                  className="del sm"
-                  onClick={() => db.catRules.delete(r.id!)}
-                >
-                  ✕
-                </button>
-              </span>
-            );
-          })}
-        </div>
-        <div className="add-row">
-          <input
-            placeholder="키워드 (예: 스타벅스)"
-            value={newRuleKeyword}
-            onChange={(e) => setNewRuleKeyword(e.target.value)}
-          />
-          <select
-            value={newRuleCat}
-            onChange={(e) =>
-              setNewRuleCat(e.target.value === "" ? "" : Number(e.target.value))
-            }
-          >
-            <option value="">분류 선택</option>
-            <CategorySelectOptions categories={categories ?? []} />
-          </select>
-          <button
-            className="btn-secondary"
-            onClick={async () => {
-              if (!newRuleKeyword.trim() || newRuleCat === "") return;
-              await db.catRules.add({
-                keyword: newRuleKeyword.trim(),
-                categoryId: Number(newRuleCat),
-              });
-              setNewRuleKeyword("");
-              setNewRuleCat("");
-            }}
-          >
-            추가
-          </button>
-        </div>
+        {(catRules ?? []).length === 0 && (
+          <p className="muted">규칙이 없습니다. 「기본 규칙 채우기」를 눌러 보세요.</p>
+        )}
+        {groupCategories(categories ?? []).map((g) => (
+          <div key={g.parent.id} className="cat-block">
+            <div className="cat-block-head">
+              <span className="dot" style={{ background: g.parent.color }} />
+              <b>{g.parent.name}</b>
+            </div>
+            <RuleChips
+              categoryId={g.parent.id!}
+              rules={rulesByCategory.get(g.parent.id!) ?? []}
+            />
+            {g.children.map((c) => (
+              <div key={c.id} className="cat-block-sub">
+                <div className="cat-block-head sub">
+                  <span className="dot" style={{ background: c.color }} />
+                  {c.name}
+                </div>
+                <RuleChips
+                  categoryId={c.id!}
+                  rules={rulesByCategory.get(c.id!) ?? []}
+                />
+              </div>
+            ))}
+          </div>
+        ))}
+        {orphanRules.length > 0 && (
+          <div className="cat-block">
+            <div className="cat-block-head">
+              <span className="muted">삭제된 분류에 남은 규칙</span>
+            </div>
+            <div className="tag-list" style={{ marginTop: 8 }}>
+              {orphanRules.map((r) => (
+                <span key={r.id} className="cat-tag">
+                  {r.keyword}
+                  <button
+                    className="del sm"
+                    onClick={() => db.catRules.delete(r.id!)}
+                  >
+                    ✕
+                  </button>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
