@@ -529,6 +529,15 @@ select:focus {
   min-width: 160px;
 }
 
+/* ---- Drive sync status ---- */
+.drive-status {
+  margin-top: 10px;
+}
+.drive-status.stale {
+  color: var(--expense);
+  font-weight: 600;
+}
+
 /* ---- Category blocks ---- */
 .cat-block {
   border: 1px solid var(--border);

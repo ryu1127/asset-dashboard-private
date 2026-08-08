@@ -55,3 +55,27 @@ export function daysInMonth(ym: string): number {
   const [y, m] = ym.split("-").map(Number);
   return new Date(y, m, 0).getDate();
 }
+
+// "3일 전", "방금 전" 같은 상대 시간
+export function relativeTime(d: Date): string {
+  const diffMs = Date.now() - d.getTime();
+  const min = Math.floor(diffMs / 60000);
+  if (min < 1) return "방금 전";
+  if (min < 60) return `${min}분 전`;
+  const hour = Math.floor(min / 60);
+  if (hour < 24) return `${hour}시간 전`;
+  const day = Math.floor(hour / 24);
+  if (day < 30) return `${day}일 전`;
+  const month = Math.floor(day / 30);
+  if (month < 12) return `${month}개월 전`;
+  return `${Math.floor(month / 12)}년 전`;
+}
+
+export function datetimeLabel(d: Date): string {
+  const y = d.getFullYear();
+  const mo = String(d.getMonth() + 1).padStart(2, "0");
+  const da = String(d.getDate()).padStart(2, "0");
+  const h = String(d.getHours()).padStart(2, "0");
+  const mi = String(d.getMinutes()).padStart(2, "0");
+  return `${y}-${mo}-${da} ${h}:${mi}`;
+}

@@ -12,11 +12,13 @@ import {
 } from "../db";
 import {
   downloadFromDrive,
+  getLastSavedAt,
   isSignedIn,
   signIn,
   uploadToDrive,
 } from "../drive";
 import { groupCategories } from "../categoryTree";
+import { datetimeLabel, relativeTime } from "../format";
 
 const PALETTE = ["#ef4444", "#f97316", "#22c55e", "#06b6d4", "#8b5cf6", "#ec4899"];
 
@@ -155,6 +157,7 @@ export default function Settings() {
   const [newCatKind, setNewCatKind] = useState<"수입" | "지출">("지출");
   const [driveConnected, setDriveConnected] = useState(isSignedIn());
   const [driveBusy, setDriveBusy] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState(getLastSavedAt());
 
   const rulesByCategory = useMemo(() => {
     const m = new Map<number, CatRule[]>();
@@ -222,6 +225,7 @@ export default function Settings() {
     try {
       const json = await exportData();
       await uploadToDrive(json);
+      setLastSavedAt(getLastSavedAt());
       alert("구글 드라이브에 저장했습니다.");
     } catch (err) {
       alert(err instanceof Error ? err.message : "드라이브 저장에 실패했습니다.");
@@ -315,6 +319,19 @@ export default function Settings() {
             </>
           )}
         </div>
+        <p
+          className={
+            "muted drive-status" +
+            (!lastSavedAt ||
+            Date.now() - lastSavedAt.getTime() > 3 * 24 * 60 * 60 * 1000
+              ? " stale"
+              : "")
+          }
+        >
+          {lastSavedAt
+            ? `마지막 저장: ${datetimeLabel(lastSavedAt)} (${relativeTime(lastSavedAt)})`
+            : "아직 드라이브에 저장한 적이 없어요."}
+        </p>
       </div>
 
       <div className="card">

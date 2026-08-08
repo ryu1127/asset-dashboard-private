@@ -7,6 +7,17 @@ const CLIENT_ID =
   "1030627223748-dtferlqfodgm5mo25im7jhs95kasu0p4.apps.googleusercontent.com";
 const SCOPE = "https://www.googleapis.com/auth/drive.file";
 const BACKUP_FILENAME = "asset-dashboard-backup.json";
+const LAST_SAVED_KEY = "driveLastSavedAt";
+
+// 마지막으로 「드라이브에 저장」이 성공한 시각 (이 브라우저 기준)
+export function getLastSavedAt(): Date | null {
+  const raw = localStorage.getItem(LAST_SAVED_KEY);
+  return raw ? new Date(raw) : null;
+}
+
+function markSaved() {
+  localStorage.setItem(LAST_SAVED_KEY, new Date().toISOString());
+}
 
 declare global {
   interface Window {
@@ -107,6 +118,7 @@ export async function uploadToDrive(json: string): Promise<void> {
     body,
   });
   if (!res.ok) throw new Error("드라이브 저장에 실패했습니다.");
+  markSaved();
 }
 
 export async function downloadFromDrive(): Promise<string> {
