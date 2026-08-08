@@ -507,6 +507,24 @@ select:focus {
 .budget-table td {
   vertical-align: middle;
 }
+.budget-computed-tag {
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  padding: 1px 6px;
+  border-radius: 10px;
+  vertical-align: middle;
+}
+.bal-input.computed {
+  display: inline-block;
+  background: var(--bg);
+  color: var(--text);
+  font-weight: 700;
+  cursor: default;
+}
 .budget-input {
   width: 130px;
 }

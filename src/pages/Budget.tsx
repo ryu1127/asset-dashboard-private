@@ -43,26 +43,40 @@ export default function Budget() {
     }
   }
 
-  // 예산이 설정된 카테고리만 요약에 포함
+  const expenseGroups = useMemo(
+    () => groupCategories(expenseCats),
+    [expenseCats]
+  );
+
+  // 하위 카테고리가 있는 카테고리는 직접 예산을 걸지 않고, 하위 예산의 합으로
+  // 계산한다. 예산 합계(총 예산/총 지출)는 그래서 "말단" 카테고리
+  // (하위가 없는 카테고리)만 더한다 — 부모 것까지 더하면 이중 계산됨.
   const totals = useMemo(() => {
     let budget = 0;
     let spent = 0;
-    for (const c of expenseCats) {
+    const leaves = expenseGroups.flatMap((g) =>
+      g.children.length === 0 ? [g.parent] : g.children
+    );
+    for (const c of leaves) {
       const b = budgetMap.get(c.id!) ?? 0;
       if (b <= 0) continue;
       budget += b;
       spent += spentMap.get(c.id!) ?? 0;
     }
     return { budget, spent, remaining: budget - spent };
-  }, [expenseCats, budgetMap, spentMap]);
+  }, [expenseGroups, budgetMap, spentMap]);
 
   const overallPct =
     totals.budget > 0 ? Math.min((totals.spent / totals.budget) * 100, 100) : 0;
   const isOver = totals.spent > totals.budget && totals.budget > 0;
 
-  function budgetRow(c: { id?: number; name: string; color: string }, indent = false) {
-    const budget = budgetMap.get(c.id!) ?? 0;
-    const spent = spentMap.get(c.id!) ?? 0;
+  function budgetRow(
+    c: { id?: number; name: string; color: string },
+    opts: { indent?: boolean; computed?: { budget: number; spent: number } } = {}
+  ) {
+    const { indent, computed } = opts;
+    const budget = computed ? computed.budget : budgetMap.get(c.id!) ?? 0;
+    const spent = computed ? computed.spent : spentMap.get(c.id!) ?? 0;
     const pct = budget > 0 ? (spent / budget) * 100 : 0;
     const over = budget > 0 && spent > budget;
     const remaining = budget - spent;
@@ -71,20 +85,27 @@ export default function Budget() {
         <td>
           <span className="dot" style={{ background: c.color }} />
           {c.name}
+          {computed && <span className="budget-computed-tag">하위 합계</span>}
         </td>
         <td>
-          <input
-            className="bal-input budget-input"
-            type="text"
-            inputMode="numeric"
-            placeholder="미설정"
-            defaultValue={budget > 0 ? budget.toLocaleString() : ""}
-            onBlur={(e) => {
-              setBudget(c.id!, e.target.value);
-              const n = Number(e.target.value.replace(/[^\d]/g, ""));
-              e.target.value = n > 0 ? n.toLocaleString() : "";
-            }}
-          />
+          {computed ? (
+            <span className="bal-input budget-input computed">
+              {budget > 0 ? won(budget) : "—"}
+            </span>
+          ) : (
+            <input
+              className="bal-input budget-input"
+              type="text"
+              inputMode="numeric"
+              placeholder="미설정"
+              defaultValue={budget > 0 ? budget.toLocaleString() : ""}
+              onBlur={(e) => {
+                setBudget(c.id!, e.target.value);
+                const n = Number(e.target.value.replace(/[^\d]/g, ""));
+                e.target.value = n > 0 ? n.toLocaleString() : "";
+              }}
+            />
+          )}
         </td>
         <td className="right">{spent > 0 ? won(spent) : "—"}</td>
         <td>
@@ -176,17 +197,34 @@ export default function Budget() {
             </tr>
           </thead>
           <tbody>
-            {groupCategories(expenseCats).map((g) => (
-              <Fragment key={g.parent.id}>
-                {budgetRow(g.parent)}
-                {g.children.map((c) => budgetRow(c, true))}
-              </Fragment>
-            ))}
+            {expenseGroups.map((g) => {
+              if (g.children.length === 0) {
+                return <Fragment key={g.parent.id}>{budgetRow(g.parent)}</Fragment>;
+              }
+              const childBudget = g.children.reduce(
+                (sum, c) => sum + (budgetMap.get(c.id!) ?? 0),
+                0
+              );
+              const childSpent = g.children.reduce(
+                (sum, c) => sum + (spentMap.get(c.id!) ?? 0),
+                0
+              );
+              return (
+                <Fragment key={g.parent.id}>
+                  {budgetRow(g.parent, {
+                    computed: { budget: childBudget, spent: childSpent },
+                  })}
+                  {g.children.map((c) => budgetRow(c, { indent: true }))}
+                </Fragment>
+              );
+            })}
           </tbody>
         </table>
         <p className="muted" style={{ marginTop: 12 }}>
           금액을 입력하고 칸 밖을 클릭하면 저장됩니다. 예산은 매월 동일하게
-          적용되고, 0으로 지우면 예산이 해제됩니다.
+          적용되고, 0으로 지우면 예산이 해제됩니다. 하위 카테고리가 있는
+          카테고리는 직접 입력할 수 없고, 하위 카테고리 예산의 합으로
+          자동 계산됩니다.
         </p>
       </div>
     </div>
