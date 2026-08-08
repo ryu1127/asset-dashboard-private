@@ -18,6 +18,7 @@ export interface Category {
   kind: Kind;
   color: string;
   parentId?: number; // 상위 카테고리 id (없으면 최상위)
+  order?: number; // 같은 레벨(형제) 안에서의 표시 순서. 없으면 id로 정렬.
 }
 
 export interface Account {

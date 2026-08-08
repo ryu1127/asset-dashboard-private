@@ -611,6 +611,40 @@ select:focus {
 .child-row {
   gap: 6px;
 }
+
+/* 하위 카테고리를 오른쪽에 나란히 배치 (분류 카테고리 카드 전용) */
+.cat-block.cat-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+.cat-row .cat-block-head {
+  flex: 0 0 auto;
+  min-width: 170px;
+}
+.cat-row .cat-block-body {
+  flex: 1 1 auto;
+  margin-top: 0;
+}
+
+.drag-handle {
+  cursor: grab;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1;
+  user-select: none;
+}
+.drag-handle:active {
+  cursor: grabbing;
+}
+.cat-block.drag-over {
+  outline: 2px dashed var(--primary);
+  outline-offset: 2px;
+}
+.child-row.drag-over {
+  outline: 2px dashed var(--primary);
+  outline-offset: 1px;
+}
 .link-btn {
   background: none;
   border: none;
@@ -665,6 +699,12 @@ select:focus {
   .sidebar-foot,
   .brand-sub {
     display: none;
+  }
+  .cat-block.cat-row {
+    flex-direction: column;
+  }
+  .cat-row .cat-block-head {
+    min-width: 0;
   }
   .kpi-row,
   .grid-2,
