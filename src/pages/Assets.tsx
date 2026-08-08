@@ -68,7 +68,23 @@ export default function Assets() {
       .map((m) => ({ month: monthLabel(m), 순자산: byMonth.get(m)! }));
   }, [snapshots, accMap]);
 
-  const latestNet = netWorth.length ? netWorth[netWorth.length - 1].순자산 : 0;
+  const latestMonth = useMemo(() => {
+    const months = [...new Set((snapshots ?? []).map((s) => s.month))].sort();
+    return months[months.length - 1];
+  }, [snapshots]);
+
+  // 최근 입력된 달 기준 총자산 / 총부채
+  const latestTotals = useMemo(() => {
+    let assets = 0;
+    let debts = 0;
+    for (const s of snapshots ?? []) {
+      if (s.month !== latestMonth) continue;
+      const acc = accMap.get(s.accountId);
+      if (acc?.type === "부채") debts += s.balance;
+      else assets += s.balance;
+    }
+    return { assets, debts, net: assets - debts };
+  }, [snapshots, latestMonth, accMap]);
 
   return (
     <div>
@@ -80,9 +96,17 @@ export default function Assets() {
       </header>
 
       <section className="kpi-row">
+        <div className="kpi">
+          <div className="kpi-label">총자산 ({latestMonth ?? "—"})</div>
+          <div className="kpi-value income">{won(latestTotals.assets)}</div>
+        </div>
+        <div className="kpi">
+          <div className="kpi-label">총부채 ({latestMonth ?? "—"})</div>
+          <div className="kpi-value expense">{won(latestTotals.debts)}</div>
+        </div>
         <div className="kpi wide">
-          <div className="kpi-label">최근 순자산</div>
-          <div className="kpi-value">{won(latestNet)}</div>
+          <div className="kpi-label">순자산</div>
+          <div className="kpi-value">{won(latestTotals.net)}</div>
         </div>
       </section>
 
@@ -143,36 +167,48 @@ export default function Assets() {
             </tr>
           </thead>
           <tbody>
-            {accounts?.map((a) => (
-              <tr key={a.id}>
-                <td>{a.name}</td>
-                <td className="muted">{a.type}</td>
-                <td className="muted">{a.owner}</td>
-                <td className="right">
-                  <input
-                    className="bal-input"
-                    type="text"
-                    inputMode="numeric"
-                    placeholder="0"
-                    value={
-                      balanceFor(a.id!) === ""
-                        ? ""
-                        : Number(
-                            balanceFor(a.id!).replace(/,/g, "")
-                          ).toLocaleString()
-                    }
-                    onChange={(e) =>
-                      setBalances((prev) => ({
-                        ...prev,
-                        [a.id!]: e.target.value.replace(/[^\d]/g, ""),
-                      }))
-                    }
-                  />
-                </td>
-              </tr>
-            ))}
+            {accounts?.map((a) => {
+              const isDebt = a.type === "부채";
+              return (
+                <tr key={a.id} className={isDebt ? "debt-row" : ""}>
+                  <td>{a.name}</td>
+                  <td>
+                    <span className={isDebt ? "chip debt" : "muted"}>
+                      {a.type}
+                    </span>
+                  </td>
+                  <td className="muted">{a.owner}</td>
+                  <td className="right">
+                    {isDebt && <span className="debt-sign">−</span>}
+                    <input
+                      className={"bal-input" + (isDebt ? " debt" : "")}
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="0"
+                      value={
+                        balanceFor(a.id!) === ""
+                          ? ""
+                          : Number(
+                              balanceFor(a.id!).replace(/,/g, "")
+                            ).toLocaleString()
+                      }
+                      onChange={(e) =>
+                        setBalances((prev) => ({
+                          ...prev,
+                          [a.id!]: e.target.value.replace(/[^\d]/g, ""),
+                        }))
+                      }
+                    />
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
+        <p className="muted" style={{ marginTop: 12 }}>
+          「부채」 계좌는 빚진 금액을 그대로(양수로) 입력하세요. 순자산 계산 시
+          자동으로 빠집니다.
+        </p>
         <button className="btn-primary" onClick={save}>
           {month} 잔액 저장
         </button>
