@@ -7,6 +7,12 @@ import {
   seedDefaultRules,
   type AccountType,
 } from "../db";
+import {
+  downloadFromDrive,
+  isSignedIn,
+  signIn,
+  uploadToDrive,
+} from "../drive";
 
 const ACCOUNT_TYPES: AccountType[] = [
   "현금",
@@ -31,6 +37,8 @@ export default function Settings() {
   const [newCatKind, setNewCatKind] = useState<"수입" | "지출">("지출");
   const [newRuleKeyword, setNewRuleKeyword] = useState("");
   const [newRuleCat, setNewRuleCat] = useState<number | "">("");
+  const [driveConnected, setDriveConnected] = useState(isSignedIn());
+  const [driveBusy, setDriveBusy] = useState(false);
 
   const catNameMap = new Map(categories?.map((c) => [c.id!, c]) ?? []);
 
@@ -66,6 +74,47 @@ export default function Settings() {
     e.target.value = "";
   }
 
+  async function doDriveConnect() {
+    setDriveBusy(true);
+    try {
+      await signIn();
+      setDriveConnected(true);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "구글 로그인에 실패했습니다.");
+    }
+    setDriveBusy(false);
+  }
+
+  async function doDriveUpload() {
+    setDriveBusy(true);
+    try {
+      const json = await exportData();
+      await uploadToDrive(json);
+      alert("구글 드라이브에 저장했습니다.");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "드라이브 저장에 실패했습니다.");
+    }
+    setDriveBusy(false);
+  }
+
+  async function doDriveDownload() {
+    if (
+      !confirm(
+        "드라이브에서 불러오면 현재 이 브라우저의 데이터가 모두 드라이브 백업 내용으로 교체됩니다. 계속할까요?"
+      )
+    )
+      return;
+    setDriveBusy(true);
+    try {
+      const json = await downloadFromDrive();
+      await importData(json);
+      alert("드라이브에서 불러오기 완료!");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "드라이브 불러오기에 실패했습니다.");
+    }
+    setDriveBusy(false);
+  }
+
   return (
     <div>
       <header className="page-head">
@@ -95,6 +144,44 @@ export default function Settings() {
             style={{ display: "none" }}
             onChange={doImport}
           />
+        </div>
+      </div>
+
+      <div className="card">
+        <h3>☁️ 구글 드라이브 동기화</h3>
+        <p className="muted">
+          기기마다 데이터가 따로 저장되므로, 다른 기기에서 이어보려면 구글
+          드라이브에 저장한 뒤 그 기기에서 불러오세요. 실시간 동기화가
+          아니므로, 여러 기기에서 동시에 수정하면 나중에 저장한 내용이
+          이전 내용을 덮어씁니다.
+        </p>
+        <div className="row-btns">
+          {!driveConnected ? (
+            <button
+              className="btn-secondary"
+              disabled={driveBusy}
+              onClick={doDriveConnect}
+            >
+              구글 계정 연결
+            </button>
+          ) : (
+            <>
+              <button
+                className="btn-primary"
+                disabled={driveBusy}
+                onClick={doDriveUpload}
+              >
+                드라이브에 저장
+              </button>
+              <button
+                className="btn-secondary"
+                disabled={driveBusy}
+                onClick={doDriveDownload}
+              >
+                드라이브에서 불러오기
+              </button>
+            </>
+          )}
         </div>
       </div>
 
