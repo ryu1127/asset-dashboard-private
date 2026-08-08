@@ -2,6 +2,7 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { useMemo, useState } from "react";
 import { db, postDueRecurring, type Kind } from "../db";
 import { currentMonth, won } from "../format";
+import CategorySelectOptions from "../components/CategorySelectOptions";
 
 export default function Recurring() {
   const members = useLiveQuery(() => db.members.toArray(), []);
@@ -161,11 +162,7 @@ export default function Recurring() {
               }
             >
               <option value="">선택</option>
-              {catOptions.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
+              <CategorySelectOptions categories={catOptions} />
             </select>
           </label>
           <label>

@@ -13,6 +13,8 @@ import {
   signIn,
   uploadToDrive,
 } from "../drive";
+import { groupCategories } from "../categoryTree";
+import CategorySelectOptions from "../components/CategorySelectOptions";
 
 const ACCOUNT_TYPES: AccountType[] = [
   "현금",
@@ -35,6 +37,7 @@ export default function Settings() {
   const [newAccOwner, setNewAccOwner] = useState("공동");
   const [newCatName, setNewCatName] = useState("");
   const [newCatKind, setNewCatKind] = useState<"수입" | "지출">("지출");
+  const [newCatParentId, setNewCatParentId] = useState<number | "">("");
   const [newRuleKeyword, setNewRuleKeyword] = useState("");
   const [newRuleCat, setNewRuleCat] = useState<number | "">("");
   const [driveConnected, setDriveConnected] = useState(isSignedIn());
@@ -286,24 +289,99 @@ export default function Settings() {
 
       <div className="card">
         <h3>🏷️ 분류 카테고리</h3>
-        <div className="tag-list">
-          {categories?.map((c) => (
-            <span key={c.id} className="cat-tag">
-              <span className="dot" style={{ background: c.color }} />
-              {c.name}
-              <span className="muted">({c.kind})</span>
-              <button
-                className="del sm"
-                onClick={() =>
-                  confirm(`「${c.name}」 분류를 삭제할까요?`) &&
-                  db.categories.delete(c.id!)
-                }
-              >
-                ✕
-              </button>
-            </span>
-          ))}
-        </div>
+        <p className="muted">
+          카테고리 아래에 하위 카테고리를 만들 수 있어요. 예: 「급여」 아래
+          「월급」·「상여/보너스」. 하위 카테고리가 없는 항목은 옆의 선택창으로
+          다른 카테고리 아래로 옮길 수 있습니다.
+        </p>
+        {groupCategories(categories ?? []).map((g) => {
+          const topLevelSameKind = (categories ?? []).filter(
+            (c) => !c.parentId && c.kind === g.parent.kind
+          );
+          return (
+            <details key={g.parent.id} className="cat-tree" open>
+              <summary className="cat-tree-head">
+                <span className="dot" style={{ background: g.parent.color }} />
+                <b>{g.parent.name}</b>
+                <span className="muted">({g.parent.kind})</span>
+                {g.children.length === 0 && (
+                  <select
+                    className="parent-select"
+                    value=""
+                    onChange={(e) => {
+                      if (e.target.value === "") return;
+                      db.categories.update(g.parent.id!, {
+                        parentId: Number(e.target.value),
+                      });
+                    }}
+                  >
+                    <option value="">하위로 옮기기...</option>
+                    {topLevelSameKind
+                      .filter((p) => p.id !== g.parent.id)
+                      .map((p) => (
+                        <option key={p.id} value={p.id}>
+                          「{p.name}」 하위로
+                        </option>
+                      ))}
+                  </select>
+                )}
+                <button
+                  className="del sm"
+                  onClick={() => {
+                    if (g.children.length > 0) {
+                      alert(
+                        "하위 카테고리가 있는 카테고리는 삭제할 수 없습니다. 하위 카테고리를 먼저 삭제하거나 옮기세요."
+                      );
+                      return;
+                    }
+                    if (confirm(`「${g.parent.name}」 분류를 삭제할까요?`))
+                      db.categories.delete(g.parent.id!);
+                  }}
+                >
+                  ✕
+                </button>
+              </summary>
+              {g.children.length > 0 && (
+                <div className="cat-tree-body">
+                  {g.children.map((c) => (
+                    <span key={c.id} className="cat-tag child-row">
+                      <span className="dot" style={{ background: c.color }} />
+                      {c.name}
+                      <select
+                        className="parent-select"
+                        value={c.parentId ?? ""}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          db.categories.update(c.id!, {
+                            parentId: v === "" ? undefined : Number(v),
+                          });
+                        }}
+                      >
+                        <option value="">최상위로</option>
+                        {topLevelSameKind
+                          .filter((p) => p.id !== c.id)
+                          .map((p) => (
+                            <option key={p.id} value={p.id}>
+                              「{p.name}」 하위로
+                            </option>
+                          ))}
+                      </select>
+                      <button
+                        className="del sm"
+                        onClick={() =>
+                          confirm(`「${c.name}」 분류를 삭제할까요?`) &&
+                          db.categories.delete(c.id!)
+                        }
+                      >
+                        ✕
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </details>
+          );
+        })}
         <div className="add-row">
           <input
             placeholder="분류 이름"
@@ -311,7 +389,28 @@ export default function Settings() {
             onChange={(e) => setNewCatName(e.target.value)}
           />
           <select
+            value={newCatParentId}
+            onChange={(e) => {
+              const v = e.target.value;
+              setNewCatParentId(v === "" ? "" : Number(v));
+              if (v !== "") {
+                const p = categories?.find((c) => c.id === Number(v));
+                if (p) setNewCatKind(p.kind);
+              }
+            }}
+          >
+            <option value="">최상위 카테고리로 추가</option>
+            {(categories ?? [])
+              .filter((c) => !c.parentId)
+              .map((p) => (
+                <option key={p.id} value={p.id}>
+                  「{p.name}」 하위로 추가
+                </option>
+              ))}
+          </select>
+          <select
             value={newCatKind}
+            disabled={newCatParentId !== ""}
             onChange={(e) => setNewCatKind(e.target.value as "수입" | "지출")}
           >
             <option value="지출">지출</option>
@@ -326,8 +425,10 @@ export default function Settings() {
                 name: newCatName.trim(),
                 kind: newCatKind,
                 color: palette[Math.floor(Math.random() * palette.length)],
+                parentId: newCatParentId === "" ? undefined : newCatParentId,
               });
               setNewCatName("");
+              setNewCatParentId("");
             }}
           >
             추가
@@ -393,11 +494,7 @@ export default function Settings() {
             }
           >
             <option value="">분류 선택</option>
-            {categories?.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name} ({c.kind})
-              </option>
-            ))}
+            <CategorySelectOptions categories={categories ?? []} />
           </select>
           <button
             className="btn-secondary"

@@ -17,6 +17,7 @@ export interface Category {
   name: string;
   kind: Kind;
   color: string;
+  parentId?: number; // 상위 카테고리 id (없으면 최상위)
 }
 
 export interface Account {
@@ -98,6 +99,9 @@ export class AssetDB extends Dexie {
     });
     this.version(4).stores({
       catRules: "++id, keyword, categoryId",
+    });
+    this.version(5).stores({
+      categories: "++id, name, kind, parentId",
     });
   }
 }

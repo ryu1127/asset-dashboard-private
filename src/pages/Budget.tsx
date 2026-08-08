@@ -1,7 +1,8 @@
 import { useLiveQuery } from "dexie-react-hooks";
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { db } from "../db";
 import { currentMonth, monthOf, won } from "../format";
+import { groupCategories } from "../categoryTree";
 
 export default function Budget() {
   const [month, setMonth] = useState(currentMonth());
@@ -58,6 +59,52 @@ export default function Budget() {
   const overallPct =
     totals.budget > 0 ? Math.min((totals.spent / totals.budget) * 100, 100) : 0;
   const isOver = totals.spent > totals.budget && totals.budget > 0;
+
+  function budgetRow(c: { id?: number; name: string; color: string }, indent = false) {
+    const budget = budgetMap.get(c.id!) ?? 0;
+    const spent = spentMap.get(c.id!) ?? 0;
+    const pct = budget > 0 ? (spent / budget) * 100 : 0;
+    const over = budget > 0 && spent > budget;
+    const remaining = budget - spent;
+    return (
+      <tr key={c.id} className={indent ? "budget-child-row" : ""}>
+        <td>
+          <span className="dot" style={{ background: c.color }} />
+          {c.name}
+        </td>
+        <td>
+          <input
+            className="bal-input budget-input"
+            type="text"
+            inputMode="numeric"
+            placeholder="미설정"
+            defaultValue={budget > 0 ? budget.toLocaleString() : ""}
+            onBlur={(e) => {
+              setBudget(c.id!, e.target.value);
+              const n = Number(e.target.value.replace(/[^\d]/g, ""));
+              e.target.value = n > 0 ? n.toLocaleString() : "";
+            }}
+          />
+        </td>
+        <td className="right">{spent > 0 ? won(spent) : "—"}</td>
+        <td>
+          {budget > 0 ? (
+            <div className="progress">
+              <div
+                className={"progress-fill " + (over ? "over" : "")}
+                style={{ width: Math.min(pct, 100) + "%" }}
+              />
+            </div>
+          ) : (
+            <span className="muted">예산 미설정</span>
+          )}
+        </td>
+        <td className={"right " + (over ? "expense" : "")}>
+          {budget > 0 ? (over ? "-" : "") + won(Math.abs(remaining)) : "—"}
+        </td>
+      </tr>
+    );
+  }
 
   return (
     <div>
@@ -129,53 +176,12 @@ export default function Budget() {
             </tr>
           </thead>
           <tbody>
-            {expenseCats.map((c) => {
-              const budget = budgetMap.get(c.id!) ?? 0;
-              const spent = spentMap.get(c.id!) ?? 0;
-              const pct = budget > 0 ? (spent / budget) * 100 : 0;
-              const over = budget > 0 && spent > budget;
-              const remaining = budget - spent;
-              return (
-                <tr key={c.id}>
-                  <td>
-                    <span className="dot" style={{ background: c.color }} />
-                    {c.name}
-                  </td>
-                  <td>
-                    <input
-                      className="bal-input budget-input"
-                      type="text"
-                      inputMode="numeric"
-                      placeholder="미설정"
-                      defaultValue={budget > 0 ? budget.toLocaleString() : ""}
-                      onBlur={(e) => {
-                        setBudget(c.id!, e.target.value);
-                        const n = Number(e.target.value.replace(/[^\d]/g, ""));
-                        e.target.value = n > 0 ? n.toLocaleString() : "";
-                      }}
-                    />
-                  </td>
-                  <td className="right">{spent > 0 ? won(spent) : "—"}</td>
-                  <td>
-                    {budget > 0 ? (
-                      <div className="progress">
-                        <div
-                          className={"progress-fill " + (over ? "over" : "")}
-                          style={{ width: Math.min(pct, 100) + "%" }}
-                        />
-                      </div>
-                    ) : (
-                      <span className="muted">예산 미설정</span>
-                    )}
-                  </td>
-                  <td className={"right " + (over ? "expense" : "")}>
-                    {budget > 0
-                      ? (over ? "-" : "") + won(Math.abs(remaining))
-                      : "—"}
-                  </td>
-                </tr>
-              );
-            })}
+            {groupCategories(expenseCats).map((g) => (
+              <Fragment key={g.parent.id}>
+                {budgetRow(g.parent)}
+                {g.children.map((c) => budgetRow(c, true))}
+              </Fragment>
+            ))}
           </tbody>
         </table>
         <p className="muted" style={{ marginTop: 12 }}>

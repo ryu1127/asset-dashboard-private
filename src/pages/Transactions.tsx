@@ -2,6 +2,7 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { useMemo, useState } from "react";
 import { db, type Kind } from "../db";
 import { todayISO, won } from "../format";
+import CategorySelectOptions from "../components/CategorySelectOptions";
 
 export default function Transactions() {
   const members = useLiveQuery(() => db.members.toArray(), []);
@@ -180,11 +181,7 @@ export default function Transactions() {
               }
             >
               <option value="">선택</option>
-              {catOptions.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
+              <CategorySelectOptions categories={catOptions} />
             </select>
           </label>
           <label>

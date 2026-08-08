@@ -529,6 +529,56 @@ select:focus {
   min-width: 160px;
 }
 
+/* ---- Category tree ---- */
+.cat-tree {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+.cat-tree-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  list-style: none;
+}
+.cat-tree-head::-webkit-details-marker {
+  display: none;
+}
+.cat-tree-head::before {
+  content: "▸";
+  color: var(--muted);
+  font-size: 11px;
+  margin-right: 2px;
+}
+.cat-tree[open] > .cat-tree-head::before {
+  content: "▾";
+}
+.cat-tree-head .del.sm {
+  margin-left: auto;
+}
+.cat-tree-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 2px 22px;
+}
+.child-row {
+  gap: 6px;
+}
+.parent-select {
+  font-size: 12px;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+
+/* ---- Budget grouped rows ---- */
+.budget-child-row td:first-child {
+  padding-left: 28px;
+  color: var(--muted);
+}
+
 @media (max-width: 860px) {
   .app {
     grid-template-columns: 1fr;
