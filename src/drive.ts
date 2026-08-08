@@ -8,6 +8,8 @@ const CLIENT_ID =
 const SCOPE = "https://www.googleapis.com/auth/drive.file";
 const BACKUP_FILENAME = "asset-dashboard-backup.json";
 const LAST_SAVED_KEY = "driveLastSavedAt";
+const TOKEN_KEY = "driveToken";
+const EVER_CONNECTED_KEY = "driveEverConnected";
 
 // 마지막으로 「드라이브에 저장」이 성공한 시각 (이 브라우저 기준)
 export function getLastSavedAt(): Date | null {
@@ -27,7 +29,11 @@ declare global {
           initTokenClient(config: {
             client_id: string;
             scope: string;
-            callback: (resp: { access_token?: string; error?: string }) => void;
+            callback: (resp: {
+              access_token?: string;
+              expires_in?: number;
+              error?: string;
+            }) => void;
           }): { requestAccessToken: (opts?: { prompt?: string }) => void };
         };
       };
@@ -35,7 +41,34 @@ declare global {
   }
 }
 
-let accessToken: string | null = null;
+// 액세스 토큰을 로컬 저장소에 남겨서, 유효 기간(보통 1시간) 안에는
+// 새로고침해도 다시 로그인할 필요가 없게 한다. 리프레시 토큰은 서버(비밀
+// 클라이언트) 없이는 발급받을 수 없어서, 만료 이후에는 다시 연결이 필요함.
+function loadStoredToken(): string | null {
+  const raw = localStorage.getItem(TOKEN_KEY);
+  if (!raw) return null;
+  try {
+    const t = JSON.parse(raw) as { accessToken: string; expiresAt: number };
+    if (t.expiresAt > Date.now()) return t.accessToken;
+  } catch {
+    // 저장된 값이 손상된 경우 무시
+  }
+  return null;
+}
+
+function storeToken(token: string, expiresInSec: number) {
+  localStorage.setItem(
+    TOKEN_KEY,
+    JSON.stringify({
+      accessToken: token,
+      // 만료 60초 전을 기준으로 잡아 경계에서 실패하지 않게 여유를 둠
+      expiresAt: Date.now() + expiresInSec * 1000 - 60_000,
+    })
+  );
+  localStorage.setItem(EVER_CONNECTED_KEY, "1");
+}
+
+let accessToken: string | null = loadStoredToken();
 
 function loadGis(): Promise<void> {
   if (window.google?.accounts?.oauth2) return Promise.resolve();
@@ -53,9 +86,8 @@ export function isSignedIn(): boolean {
   return accessToken !== null;
 }
 
-export async function signIn(): Promise<void> {
-  await loadGis();
-  await new Promise<void>((resolve, reject) => {
+function requestToken(prompt: string): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
     const client = window.google!.accounts.oauth2.initTokenClient({
       client_id: CLIENT_ID,
       scope: SCOPE,
@@ -65,15 +97,33 @@ export async function signIn(): Promise<void> {
           return;
         }
         accessToken = resp.access_token;
+        storeToken(resp.access_token, resp.expires_in ?? 3600);
         resolve();
       },
     });
-    client.requestAccessToken({ prompt: "consent" });
+    client.requestAccessToken({ prompt });
   });
+}
+
+export async function signIn(): Promise<void> {
+  await loadGis();
+  // 예전에 한 번이라도 연결한 적이 있으면, 동의 화면 없이 조용히 토큰만
+  // 다시 받아오는 걸 먼저 시도한다 (이미 허용했다는 걸 구글이 기억함).
+  // 실패하면(예: 권한 취소) 원래대로 동의 화면을 띄운다.
+  if (localStorage.getItem(EVER_CONNECTED_KEY) === "1") {
+    try {
+      await requestToken("");
+      return;
+    } catch {
+      // 조용한 재연결 실패 → 아래에서 동의 화면으로 재시도
+    }
+  }
+  await requestToken("consent");
 }
 
 export function signOut() {
   accessToken = null;
+  localStorage.removeItem(TOKEN_KEY);
 }
 
 function authHeaders(): HeadersInit {
