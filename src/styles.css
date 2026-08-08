@@ -578,6 +578,18 @@ select:focus {
 }
 
 /* ---- Category blocks ---- */
+.cat-kind-section {
+  margin-bottom: 18px;
+}
+.cat-kind-section:last-of-type {
+  margin-bottom: 0;
+}
+.cat-kind-head {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+}
 .cat-block {
   border: 1px solid var(--border);
   border-radius: 10px;

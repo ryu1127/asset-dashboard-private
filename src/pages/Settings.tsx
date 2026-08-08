@@ -164,15 +164,21 @@ export default function Settings() {
   const [draggingCatId, setDraggingCatId] = useState<number | null>(null);
   const [dragOverCatId, setDragOverCatId] = useState<number | null>(null);
 
-  // 같은 부모(형제)끼리만 순서를 바꿀 수 있다. 다른 그룹 위에 놓으면 무시.
+  // 같은 부모(형제) + 같은 종류(수입/지출)끼리만 순서를 바꿀 수 있다.
+  // 다른 그룹 위에 놓으면 무시.
   async function reorderCategory(draggedId: number, targetId: number) {
     if (draggedId === targetId) return;
     const dragged = categories?.find((c) => c.id === draggedId);
     const target = categories?.find((c) => c.id === targetId);
     if (!dragged || !target) return;
     if ((dragged.parentId ?? null) !== (target.parentId ?? null)) return;
+    if (dragged.kind !== target.kind) return;
     const siblings = (categories ?? [])
-      .filter((c) => (c.parentId ?? null) === (dragged.parentId ?? null))
+      .filter(
+        (c) =>
+          (c.parentId ?? null) === (dragged.parentId ?? null) &&
+          c.kind === dragged.kind
+      )
       .sort((a, b) => (a.order ?? a.id!) - (b.order ?? b.id!));
     const ids = siblings.map((c) => c.id!);
     const from = ids.indexOf(draggedId);
@@ -469,96 +475,47 @@ export default function Settings() {
           아래 「월급」·「상여/보너스」. ⠿를 끌어서 같은 레벨끼리 순서를 바꿀 수
           있어요.
         </p>
-        {groupCategories(categories ?? []).map((g) => {
-          const topLevelSameKind = (categories ?? []).filter(
-            (c) => !c.parentId && c.kind === g.parent.kind && c.id !== g.parent.id
-          );
-          return (
-            <div
-              key={g.parent.id}
-              className={
-                "cat-block cat-row" +
-                (dragOverCatId === g.parent.id ? " drag-over" : "")
-              }
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragOverCatId(g.parent.id!);
-              }}
-              onDragLeave={() =>
-                setDragOverCatId((id) => (id === g.parent.id ? null : id))
-              }
-              onDrop={(e) => {
-                e.preventDefault();
-                if (draggingCatId != null) reorderCategory(draggingCatId, g.parent.id!);
-                setDragOverCatId(null);
-              }}
-            >
-              <div className="cat-block-head">
-                <span
-                  className="drag-handle"
-                  draggable
-                  title="끌어서 순서 변경"
-                  onDragStart={(e) => {
-                    e.dataTransfer.effectAllowed = "move";
-                    setDraggingCatId(g.parent.id!);
+        {(["수입", "지출"] as const).map((kind) => (
+          <div key={kind} className="cat-kind-section">
+            <h4 className="cat-kind-head">
+              {kind === "수입" ? "💵 수입" : "💸 지출"}
+            </h4>
+            {groupCategories(
+              (categories ?? []).filter((c) => c.kind === kind)
+            ).map((g) => {
+              const topLevelSameKind = (categories ?? []).filter(
+                (c) =>
+                  !c.parentId && c.kind === g.parent.kind && c.id !== g.parent.id
+              );
+              return (
+                <div
+                  key={g.parent.id}
+                  className={
+                    "cat-block cat-row" +
+                    (dragOverCatId === g.parent.id ? " drag-over" : "")
+                  }
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setDragOverCatId(g.parent.id!);
                   }}
-                  onDragEnd={() => {
-                    setDraggingCatId(null);
+                  onDragLeave={() =>
+                    setDragOverCatId((id) => (id === g.parent.id ? null : id))
+                  }
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    if (draggingCatId != null)
+                      reorderCategory(draggingCatId, g.parent.id!);
                     setDragOverCatId(null);
                   }}
                 >
-                  ⠿
-                </span>
-                <span className="dot" style={{ background: g.parent.color }} />
-                <b>{g.parent.name}</b>
-                <span className="muted">({g.parent.kind})</span>
-                {g.children.length === 0 && (
-                  <MoveCategory cat={g.parent} options={topLevelSameKind} />
-                )}
-                <button
-                  className="del sm"
-                  onClick={() => {
-                    if (g.children.length > 0) {
-                      alert(
-                        "하위 카테고리가 있는 카테고리는 삭제할 수 없습니다. 하위 카테고리를 먼저 삭제하거나 옮기세요."
-                      );
-                      return;
-                    }
-                    if (confirm(`「${g.parent.name}」 분류를 삭제할까요?`))
-                      db.categories.delete(g.parent.id!);
-                  }}
-                >
-                  ✕
-                </button>
-              </div>
-              <div className="cat-block-body">
-                {g.children.map((c) => (
-                  <span
-                    key={c.id}
-                    className={
-                      "cat-tag child-row" +
-                      (dragOverCatId === c.id ? " drag-over" : "")
-                    }
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      setDragOverCatId(c.id!);
-                    }}
-                    onDragLeave={() =>
-                      setDragOverCatId((id) => (id === c.id ? null : id))
-                    }
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      if (draggingCatId != null) reorderCategory(draggingCatId, c.id!);
-                      setDragOverCatId(null);
-                    }}
-                  >
+                  <div className="cat-block-head">
                     <span
                       className="drag-handle"
                       draggable
                       title="끌어서 순서 변경"
                       onDragStart={(e) => {
                         e.dataTransfer.effectAllowed = "move";
-                        setDraggingCatId(c.id!);
+                        setDraggingCatId(g.parent.id!);
                       }}
                       onDragEnd={() => {
                         setDraggingCatId(null);
@@ -567,25 +524,85 @@ export default function Settings() {
                     >
                       ⠿
                     </span>
-                    <span className="dot" style={{ background: c.color }} />
-                    {c.name}
-                    <MoveCategory cat={c} options={topLevelSameKind} />
+                    <span className="dot" style={{ background: g.parent.color }} />
+                    <b>{g.parent.name}</b>
+                    {g.children.length === 0 && (
+                      <MoveCategory cat={g.parent} options={topLevelSameKind} />
+                    )}
                     <button
                       className="del sm"
-                      onClick={() =>
-                        confirm(`「${c.name}」 분류를 삭제할까요?`) &&
-                        db.categories.delete(c.id!)
-                      }
+                      onClick={() => {
+                        if (g.children.length > 0) {
+                          alert(
+                            "하위 카테고리가 있는 카테고리는 삭제할 수 없습니다. 하위 카테고리를 먼저 삭제하거나 옮기세요."
+                          );
+                          return;
+                        }
+                        if (confirm(`「${g.parent.name}」 분류를 삭제할까요?`))
+                          db.categories.delete(g.parent.id!);
+                      }}
                     >
                       ✕
                     </button>
-                  </span>
-                ))}
-                <AddChildCategory parentId={g.parent.id!} kind={g.parent.kind} />
-              </div>
-            </div>
-          );
-        })}
+                  </div>
+                  <div className="cat-block-body">
+                    {g.children.map((c) => (
+                      <span
+                        key={c.id}
+                        className={
+                          "cat-tag child-row" +
+                          (dragOverCatId === c.id ? " drag-over" : "")
+                        }
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          setDragOverCatId(c.id!);
+                        }}
+                        onDragLeave={() =>
+                          setDragOverCatId((id) => (id === c.id ? null : id))
+                        }
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          if (draggingCatId != null)
+                            reorderCategory(draggingCatId, c.id!);
+                          setDragOverCatId(null);
+                        }}
+                      >
+                        <span
+                          className="drag-handle"
+                          draggable
+                          title="끌어서 순서 변경"
+                          onDragStart={(e) => {
+                            e.dataTransfer.effectAllowed = "move";
+                            setDraggingCatId(c.id!);
+                          }}
+                          onDragEnd={() => {
+                            setDraggingCatId(null);
+                            setDragOverCatId(null);
+                          }}
+                        >
+                          ⠿
+                        </span>
+                        <span className="dot" style={{ background: c.color }} />
+                        {c.name}
+                        <MoveCategory cat={c} options={topLevelSameKind} />
+                        <button
+                          className="del sm"
+                          onClick={() =>
+                            confirm(`「${c.name}」 분류를 삭제할까요?`) &&
+                            db.categories.delete(c.id!)
+                          }
+                        >
+                          ✕
+                        </button>
+                      </span>
+                    ))}
+                    <AddChildCategory parentId={g.parent.id!} kind={g.parent.kind} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ))}
         <div className="add-row">
           <input
             placeholder="새 최상위 카테고리 이름"
