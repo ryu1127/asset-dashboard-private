@@ -261,7 +261,6 @@ export default function Settings() {
       const json = await exportData();
       await uploadToDrive(json);
       setLastSavedAt(getLastSavedAt());
-      alert("구글 드라이브에 저장했습니다.");
     } catch (err) {
       alert(err instanceof Error ? err.message : "드라이브 저장에 실패했습니다.");
     }
