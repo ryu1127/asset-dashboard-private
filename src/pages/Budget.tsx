@@ -103,6 +103,10 @@ export default function Budget() {
     const pct = budget > 0 ? (spent / budget) * 100 : 0;
     const over = budget > 0 && spent > budget;
     const remaining = budget - spent;
+    const share =
+      budget > 0 && totals.budget > 0
+        ? Math.round((budget / totals.budget) * 100)
+        : null;
     return (
       <tr key={c.id} className={indent ? "budget-child-row" : ""}>
         <td>
@@ -128,6 +132,7 @@ export default function Budget() {
             }}
           />
         </td>
+        <td className="right muted budget-share">{share !== null ? `${share}%` : "—"}</td>
         <td className="right">{spent > 0 ? won(spent) : "—"}</td>
         <td>
           {budget > 0 ? (
@@ -212,6 +217,7 @@ export default function Budget() {
             <tr>
               <th>카테고리</th>
               <th style={{ width: 160 }}>월 예산</th>
+              <th className="right" style={{ width: 60 }}>비중</th>
               <th className="right">지출</th>
               <th style={{ width: "34%" }}>진행률</th>
               <th className="right">남음</th>

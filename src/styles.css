@@ -564,6 +564,10 @@ select:focus {
   font-weight: 700;
   cursor: default;
 }
+.budget-share {
+  font-size: 12px;
+  font-weight: 600;
+}
 .budget-input {
   width: 130px;
 }
