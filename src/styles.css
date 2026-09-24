@@ -1,12 +1,23 @@
 :root {
-  --bg: #f6f7f9;
+  /* 파스텔 톤 — 채도·명도를 데이터 시각화 접근성 기준(색약 구분 가능, 최소 명암비)
+     안에서 최대한 낮춰 부드럽게 잡았다. 값을 바꿀 땐 dataviz 스킬의
+     validate_palette.js로 다시 검증할 것. */
+  --bg: #f5f3fb;
   --surface: #ffffff;
-  --border: #e6e8eb;
-  --text: #1a1d21;
-  --muted: #8a919a;
-  --primary: #2563eb;
-  --income: #2563eb;
-  --expense: #ef4444;
+  --border: #e8e4f5;
+  --text: #2e2b3d;
+  --muted: #726c8a;
+  --primary: #4f6fc7;
+  --primary-tint: #eaedfb;
+  --primary-tint-2: #cad4f6;
+  --income: #4f6fc7;
+  --expense: #bd4563;
+  --expense-tint: #f7e1e7;
+  --expense-tint-border: #efc3cf;
+  --success: #41c690;
+  --success-tint: #e3f7ee;
+  --success-tint-border: #b9e8d3;
+  --track: #ede9f7;
   --radius: 14px;
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
 }
@@ -132,7 +143,7 @@ nav {
   background: var(--bg);
 }
 .nav-item.active {
-  background: #eef2ff;
+  background: var(--primary-tint);
   color: var(--primary);
 }
 
@@ -190,6 +201,100 @@ nav {
 .seg button.active {
   background: var(--primary);
   color: #fff;
+}
+
+/* ---- Dashboard controls / sheet connection ---- */
+.dash-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.sync-status {
+  margin-top: -12px;
+  margin-bottom: 14px;
+}
+.error-text {
+  color: var(--expense);
+  font-size: 13px;
+  margin: 8px 0 0;
+}
+.tx-filter-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.tx-filter-row select {
+  width: auto;
+}
+th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+th.sortable:hover {
+  color: var(--text);
+}
+.stat-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.stat-chip {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 14px;
+  min-width: 96px;
+}
+.stat-chip-label {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+.stat-chip-value {
+  font-size: 15px;
+  font-weight: 700;
+}
+.alloc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.alloc-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.alloc-name {
+  width: 96px;
+  flex-shrink: 0;
+  font-size: 13px;
+}
+.alloc-row .progress {
+  flex: 1;
+}
+.alloc-pct {
+  width: 38px;
+  flex-shrink: 0;
+  text-align: right;
+  font-size: 12px;
+}
+.alloc-amt {
+  width: 104px;
+  flex-shrink: 0;
+  text-align: right;
+  font-size: 12px;
+}
+.sheet-connected {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
 }
 
 /* ---- KPI ---- */
@@ -290,7 +395,7 @@ label {
   gap: 6px;
   font-size: 13px;
   font-weight: 600;
-  color: #4b5563;
+  color: var(--text);
 }
 input,
 select {
@@ -299,12 +404,12 @@ select {
   border-radius: 9px;
   font-size: 14px;
   font-family: inherit;
-  background: #fff;
+  background: var(--surface);
   color: var(--text);
 }
 input:focus,
 select:focus {
-  outline: 2px solid #c7d2fe;
+  outline: 2px solid var(--primary-tint-2);
   border-color: var(--primary);
 }
 
@@ -322,7 +427,7 @@ select:focus {
   filter: brightness(1.05);
 }
 .btn-secondary {
-  background: #fff;
+  background: var(--surface);
   color: var(--text);
   border: 1px solid var(--border);
   padding: 11px 22px;
@@ -373,7 +478,7 @@ select:focus {
 }
 .tx-table td {
   padding: 11px 10px;
-  border-bottom: 1px solid #f1f3f5;
+  border-bottom: 1px solid var(--border);
 }
 .tx-table tr:last-child td {
   border-bottom: none;
@@ -412,7 +517,7 @@ select:focus {
   border-radius: 6px;
 }
 .del:hover {
-  background: #fee2e2;
+  background: var(--expense-tint);
   color: var(--expense);
 }
 .del.sm {
@@ -435,10 +540,10 @@ select:focus {
 }
 .bal-input.debt {
   color: var(--expense);
-  border-color: #fecaca;
+  border-color: var(--expense-tint-border);
 }
 .debt-row td {
-  background: #fef2f2;
+  background: var(--expense-tint);
 }
 .debt-sign {
   color: var(--expense);
@@ -488,9 +593,9 @@ select:focus {
   margin-left: 6px;
   font-size: 10px;
   font-weight: 700;
-  color: #10b981;
-  background: #ecfdf5;
-  border: 1px solid #a7f3d0;
+  color: var(--success);
+  background: var(--success-tint);
+  border: 1px solid var(--success-tint-border);
   padding: 1px 6px;
   border-radius: 10px;
   vertical-align: middle;
@@ -518,7 +623,7 @@ select:focus {
 
 /* ---- Budget ---- */
 .progress {
-  background: #eef0f2;
+  background: var(--track);
   border-radius: 999px;
   height: 9px;
   overflow: hidden;
@@ -535,6 +640,17 @@ select:focus {
 }
 .progress-fill.over {
   background: var(--expense);
+}
+.progress-fill.achieved {
+  background: var(--success);
+}
+.over-budget-label {
+  font-weight: 700;
+  color: var(--expense);
+}
+.achieved-label {
+  font-weight: 700;
+  color: var(--success);
 }
 .budget-bar-head {
   display: flex;
@@ -735,6 +851,26 @@ select:focus {
 }
 .link-btn:hover {
   text-decoration: underline;
+}
+.budget-group-row {
+  cursor: pointer;
+}
+.budget-bar-head.clickable {
+  cursor: pointer;
+}
+.budget-group-row:hover {
+  background: var(--bg);
+}
+.chevron {
+  display: inline-block;
+  width: 12px;
+  margin-right: 2px;
+  font-size: 10px;
+  color: var(--muted);
+  transition: transform 0.15s ease;
+}
+.chevron.open {
+  transform: rotate(90deg);
 }
 .parent-select {
   font-size: 12px;

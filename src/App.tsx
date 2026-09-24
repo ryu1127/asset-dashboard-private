@@ -1,34 +1,22 @@
 import { useEffect, useState } from "react";
 import { NavLink, Navigate, Route, Routes } from "react-router-dom";
-import { postDueRecurring, seedIfEmpty } from "./db";
-import DriveBar from "./components/DriveBar";
-import Dashboard from "./pages/Dashboard";
-import Transactions from "./pages/Transactions";
-import Budget from "./pages/Budget";
-import Recurring from "./pages/Recurring";
-import Import from "./pages/Import";
+// DriveBar(가계부 백업): 데이터 원본이 구글 시트로 바뀐 뒤로는 백업할 게
+// 시트 연결 정보뿐이라 상단 바에서는 뺐다. 나중에 기본 시트가 아닌 다른
+// 시트로 바꿔 쓰는 기기가 여러 대가 되면 다시 켤 수 있으니 지우지 않고 둠 —
+// 정리 대기 목록: DriveBar 자체를 없앨지, 설정 화면 안으로 옮길지 결정하기.
+// import DriveBar from "./components/DriveBar";
 import Assets from "./pages/Assets";
+import Ledger from "./pages/Ledger";
 import Settings from "./pages/Settings";
 
 export default function App() {
-  const [ready, setReady] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(
     () => localStorage.getItem("sidebarOpen") !== "0"
   );
 
   useEffect(() => {
-    seedIfEmpty()
-      .then(() => postDueRecurring())
-      .finally(() => setReady(true));
-  }, []);
-
-  useEffect(() => {
     localStorage.setItem("sidebarOpen", sidebarOpen ? "1" : "0");
   }, [sidebarOpen]);
-
-  if (!ready) {
-    return <div className="loading">불러오는 중…</div>;
-  }
 
   return (
     <div className={"app" + (sidebarOpen ? "" : " sidebar-hidden")}>
@@ -49,29 +37,17 @@ export default function App() {
             </button>
           </div>
           <nav>
-            <NavLink to="/dashboard" className="nav-item">
-              <span>📊</span> 대시보드
-            </NavLink>
-            <NavLink to="/transactions" className="nav-item">
-              <span>✏️</span> 거래 입력
-            </NavLink>
-            <NavLink to="/budget" className="nav-item">
-              <span>🎯</span> 예산
-            </NavLink>
-            <NavLink to="/recurring" className="nav-item">
-              <span>🔁</span> 반복 거래
-            </NavLink>
-            <NavLink to="/import" className="nav-item">
-              <span>📥</span> 가져오기
+            <NavLink to="/ledger" className="nav-item">
+              <span>📒</span> 가계부
             </NavLink>
             <NavLink to="/assets" className="nav-item">
-              <span>💰</span> 자산 현황
+              <span>📈</span> 자산
             </NavLink>
             <NavLink to="/settings" className="nav-item">
-              <span>⚙️</span> 설정 · 백업
+              <span>⚙️</span> 설정
             </NavLink>
           </nav>
-          <div className="sidebar-foot">로컬 저장 · 데이터는 이 브라우저에만</div>
+          <div className="sidebar-foot">구글 시트 기반 · 읽기 전용</div>
         </aside>
       )}
 
@@ -86,14 +62,9 @@ export default function App() {
       )}
 
       <main className="content">
-        <DriveBar />
         <Routes>
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/transactions" element={<Transactions />} />
-          <Route path="/budget" element={<Budget />} />
-          <Route path="/recurring" element={<Recurring />} />
-          <Route path="/import" element={<Import />} />
+          <Route path="/" element={<Navigate to="/ledger" replace />} />
+          <Route path="/ledger" element={<Ledger />} />
           <Route path="/assets" element={<Assets />} />
           <Route path="/settings" element={<Settings />} />
         </Routes>

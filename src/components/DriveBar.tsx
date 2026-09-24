@@ -10,6 +10,7 @@ import {
 import { datetimeLabel, relativeTime } from "../format";
 
 // 화면 어디서나 바로 쓸 수 있는 구글 드라이브 저장/불러오기 상단 바.
+// (백업 대상은 시트 연결 정보뿐 — 가계부 데이터 자체는 연결된 구글 시트가 원본이다.)
 export default function DriveBar() {
   const [connected, setConnected] = useState(isSignedIn());
   const [busy, setBusy] = useState(false);

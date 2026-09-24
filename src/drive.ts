@@ -5,7 +5,10 @@
 
 const CLIENT_ID =
   "1030627223748-dtferlqfodgm5mo25im7jhs95kasu0p4.apps.googleusercontent.com";
-const SCOPE = "https://www.googleapis.com/auth/drive.file";
+// drive.file: 앱이 만든 백업 파일만 접근. spreadsheets.readonly: 사용자가
+// 연결한 가계부 시트를 읽기 전용으로 읽기 위해 추가.
+const SCOPE =
+  "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets.readonly";
 const BACKUP_FILENAME = "asset-dashboard-backup.json";
 const LAST_SAVED_KEY = "driveLastSavedAt";
 const TOKEN_KEY = "driveToken";
@@ -44,11 +47,20 @@ declare global {
 // 액세스 토큰을 로컬 저장소에 남겨서, 유효 기간(보통 1시간) 안에는
 // 새로고침해도 다시 로그인할 필요가 없게 한다. 리프레시 토큰은 서버(비밀
 // 클라이언트) 없이는 발급받을 수 없어서, 만료 이후에는 다시 연결이 필요함.
+// 저장된 토큰이 지금 요청하는 SCOPE 그대로 발급됐는지도 같이 저장해 둔다.
+// SCOPE를 넓힌 뒤(예: 시트 읽기 권한 추가) 예전 토큰이 남아있으면 새 권한
+// 없이 조용히 "로그인된 것"처럼 보여서 403이 나는 걸 막기 위함 — scope가
+// 다르면 만료 여부와 상관없이 무효로 취급해 다시 동의 화면을 띄운다.
 function loadStoredToken(): string | null {
   const raw = localStorage.getItem(TOKEN_KEY);
   if (!raw) return null;
   try {
-    const t = JSON.parse(raw) as { accessToken: string; expiresAt: number };
+    const t = JSON.parse(raw) as {
+      accessToken: string;
+      expiresAt: number;
+      scope?: string;
+    };
+    if (t.scope !== SCOPE) return null;
     if (t.expiresAt > Date.now()) return t.accessToken;
   } catch {
     // 저장된 값이 손상된 경우 무시
@@ -63,6 +75,7 @@ function storeToken(token: string, expiresInSec: number) {
       accessToken: token,
       // 만료 60초 전을 기준으로 잡아 경계에서 실패하지 않게 여유를 둠
       expiresAt: Date.now() + expiresInSec * 1000 - 60_000,
+      scope: SCOPE,
     })
   );
   localStorage.setItem(EVER_CONNECTED_KEY, "1");
@@ -84,6 +97,11 @@ function loadGis(): Promise<void> {
 
 export function isSignedIn(): boolean {
   return accessToken !== null;
+}
+
+// 시트 API 등 이 파일 밖에서 인증 헤더를 직접 만들어야 할 때 쓰는 현재 토큰.
+export function getAccessToken(): string | null {
+  return accessToken;
 }
 
 function requestToken(prompt: string): Promise<void> {
