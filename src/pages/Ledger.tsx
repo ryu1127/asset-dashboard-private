@@ -50,11 +50,8 @@ const PALETTE = [
   "#f7857d",
 ];
 
-function colorFor(name: string): string {
-  let h = 0;
-  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
-  return PALETTE[h % PALETTE.length];
-}
+// "미분류"는 카테고리가 아니라 예산 밖 지출을 모은 통이라 팔레트와 구분되는 회색으로.
+const UNCATEGORIZED_COLOR = "#b8b4c7";
 
 // 5% 미만인 조각은 라벨을 생략해 겹침을 피한다 (범례로 확인 가능).
 function donutPercentLabel({ percent }: { percent: number }): string {
@@ -86,6 +83,23 @@ export default function Ledger() {
   const [memberFilter, setMemberFilter] = useState<string | "all">("all");
 
   const members = useMemo(() => (data ? discoverMembers(data) : []), [data]);
+
+  // 대분류 색상은 예산설정 순서대로 팔레트를 하나씩 배정한다(해시로 정하면 서로
+  // 다른 카테고리가 같은 색으로 겹쳤다). 대분류가 팔레트보다 많아지면 그때부터 순환.
+  const colorFor = useMemo(() => {
+    const order: string[] = [];
+    for (const b of data?.budgetItems ?? []) {
+      if (!order.includes(b.category)) order.push(b.category);
+    }
+    for (const t of data?.transactions ?? []) {
+      if (t.kind === "지출" && !order.includes(t.category)) order.push(t.category);
+    }
+    return (name: string): string => {
+      if (name === "미분류") return UNCATEGORIZED_COLOR;
+      const i = order.indexOf(name);
+      return PALETTE[(i < 0 ? 0 : i) % PALETTE.length];
+    };
+  }, [data]);
 
   const summary = useMemo(
     () =>
@@ -409,7 +423,7 @@ export default function Ledger() {
             {budgetGroups.length === 0 ? (
               <Empty text="예산설정 탭에 예산을 입력하면 여기 표시됩니다." />
             ) : (
-              <table className="tx-table budget-table" style={{ marginTop: 16 }}>
+              <div className="table-scroll"><table className="tx-table budget-table" style={{ marginTop: 16 }}>
                 <thead>
                   <tr>
                     <th>
@@ -469,7 +483,7 @@ export default function Ledger() {
                     );
                   })}
                 </tbody>
-              </table>
+              </table></div>
             )}
           </div>
 
@@ -486,7 +500,7 @@ export default function Ledger() {
             {incomeSectionOpen && (incomeGroups.length === 0 ? (
               <Empty text="예산설정 탭 '수입 목표' 표를 채우면 여기 표시됩니다." />
             ) : (
-              <table className="tx-table budget-table" style={{ marginTop: 16 }}>
+              <div className="table-scroll"><table className="tx-table budget-table" style={{ marginTop: 16 }}>
                 <thead>
                   <tr>
                     <th>항목</th>
@@ -536,7 +550,7 @@ export default function Ledger() {
                     );
                   })}
                 </tbody>
-              </table>
+              </table></div>
             ))}
           </div>
 
@@ -545,7 +559,7 @@ export default function Ledger() {
               <h3>
                 연간 요약 ({yearCompare.lastYear.year} → {yearCompare.thisYear.year})
               </h3>
-              <table className="tx-table">
+              <div className="table-scroll"><table className="tx-table">
                 <thead>
                   <tr>
                     <th></th>
@@ -580,13 +594,13 @@ export default function Ledger() {
                     </td>
                   </tr>
                 </tbody>
-              </table>
+              </table></div>
             </div>
           )}
 
           <div className="card">
             <h3>월별 요약 (최근 12개월)</h3>
-            <table className="tx-table">
+            <div className="table-scroll"><table className="tx-table">
               <thead>
                 <tr>
                   <th>월</th>
@@ -609,7 +623,7 @@ export default function Ledger() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           </div>
 
           <section className="grid-2">
@@ -617,7 +631,7 @@ export default function Ledger() {
               <h3>최근 6개월 수입 vs 지출</h3>
               <ResponsiveContainer width="100%" height={260}>
                 <BarChart data={trend}>
-                  <XAxis dataKey="month" tickLine={false} axisLine={false} />
+                  <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} />
                   <YAxis tickFormatter={wonShort} tickLine={false} axisLine={false} width={48} />
                   <Tooltip formatter={(v: number) => won(v)} />
                   <Legend />
@@ -637,7 +651,13 @@ export default function Ledger() {
                       <stop offset="100%" stopColor="#41c690" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <XAxis dataKey="month" tickLine={false} axisLine={false} />
+                  <XAxis
+                    dataKey="month"
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={8}
+                    padding={{ left: 16, right: 16 }}
+                  />
                   <YAxis
                     tickFormatter={(v: number) => `${v}%`}
                     tickLine={false}
@@ -674,6 +694,7 @@ export default function Ledger() {
                       outerRadius={90}
                       paddingAngle={2}
                       label={donutPercentLabel}
+                      labelLine={false}
                     >
                       {byCategory.map((c) => (
                         <Cell key={c.name} fill={colorFor(c.name)} />
@@ -690,12 +711,13 @@ export default function Ledger() {
               <div className="card">
                 <h3>구성원별 이번 달 수입</h3>
                 <p className="muted" style={{ marginTop: -8, marginBottom: 12 }}>
-                  소분류가 "_이름"으로 끝나는 수입만 집계돼요. 지출은 용돈 몇 항목 빼면
-                  대부분 공동이라 구성원별로 나누는 게 의미가 없어 뺐어요.
+                  거래내역 탭의 "명의" 열에 이름을 적은 수입만 집계돼요. 명의를 비워둔
+                  수입은 여기엔 안 잡히고 "부부 합산"에만 들어가요. 지출은 용돈처럼
+                  소분류가 "용돈_이름"인 항목만 명의로 나뉘어요.
                 </p>
                 <ResponsiveContainer width="100%" height={240}>
                   <BarChart data={byMember}>
-                    <XAxis dataKey="name" tickLine={false} axisLine={false} />
+                    <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} />
                     <YAxis tickFormatter={wonShort} tickLine={false} axisLine={false} width={48} />
                     <Tooltip formatter={(v: number) => won(v)} />
                     <Bar dataKey="수입" fill="#4f6fc7" radius={[4, 4, 0, 0]} />
@@ -754,7 +776,7 @@ export default function Ledger() {
                     </button>
                   )}
                 </div>
-                <table className="tx-table">
+                <div className="table-scroll"><table className="tx-table">
                   <thead>
                     <tr>
                       <th className="sortable" onClick={() => toggleTxSort("date")}>
@@ -779,7 +801,9 @@ export default function Ledger() {
                         <td className="muted">{t.date}</td>
                         <td>{t.category}</td>
                         <td>{t.subCategory}</td>
-                        <td className="muted">{t.memo || "—"}</td>
+                        <td className="muted tx-memo" title={t.memo}>
+                          {t.memo || "—"}
+                        </td>
                         <td className="muted">{t.account || "—"}</td>
                         <td className={"right " + (t.kind === "수입" ? "income" : "expense")}>
                           {t.kind === "수입" ? "+" : "−"}
@@ -788,7 +812,7 @@ export default function Ledger() {
                       </tr>
                     ))}
                   </tbody>
-                </table>
+                </table></div>
               </>
             )}
           </div>

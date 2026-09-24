@@ -71,7 +71,10 @@ export default function Assets() {
 
   const typeBreakdown = useMemo(() => {
     if (!latestNW) return [];
+    // 대출은 자산현황에 음수로 들어있다. 도넛에 음수 조각이 섞이면 각도 계산이 깨져
+    // 다른 종류가 사라지므로, "자산 구성"에는 잔액이 양수인 종류만 넣는다(부채는 KPI로 따로).
     return Object.entries(latestNW.byType)
+      .filter(([, value]) => value > 0)
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value);
   }, [latestNW]);
@@ -171,7 +174,7 @@ export default function Assets() {
         <div className="empty">시트를 불러오는 중…</div>
       ) : (
         <>
-          <section className="kpi-row">
+          <section className="kpi-row cols-3">
             <div className="kpi">
               <div className="kpi-label">총자산 {latestNW?.date ? `(${latestNW.date})` : ""}</div>
               <div className="kpi-value income">{won(totalAssets)}</div>
@@ -186,10 +189,15 @@ export default function Assets() {
             </div>
           </section>
 
-          <section className="kpi-row">
+          <section className="kpi-row cols-2">
             <div className="kpi">
               <div className="kpi-label">올해 순자산 증가</div>
-              <div className={"kpi-value " + (yearGrowth != null && yearGrowth >= 0 ? "income" : "expense")}>
+              <div
+                className={
+                  "kpi-value " +
+                  (yearGrowth == null ? "" : yearGrowth >= 0 ? "income" : "expense")
+                }
+              >
                 {yearGrowth != null ? won(yearGrowth) : "—"}
               </div>
             </div>
@@ -256,7 +264,7 @@ export default function Assets() {
                     같은 계좌를 수기로도 적어두고 있었다면 중복이니 하나만 남겨두세요.
                   </p>
                   {tossData.holdings.length > 0 && (
-                    <table className="tx-table">
+                    <div className="table-scroll"><table className="tx-table">
                       <thead>
                         <tr>
                           <th>종목</th>
@@ -281,7 +289,7 @@ export default function Assets() {
                             </tr>
                           ))}
                       </tbody>
-                    </table>
+                    </table></div>
                   )}
                 </>
               ) : null}
@@ -295,6 +303,11 @@ export default function Assets() {
                 <Empty text="자산현황 탭에 계좌 잔액 스냅샷을 입력하면 여기 표시됩니다." />
               ) : (
                 <>
+                  {netWorthPoints.length < 2 ? (
+                    <p className="muted" style={{ margin: "8px 0 4px" }}>
+                      스냅샷이 2개 이상 쌓이면 추이 그래프가 표시돼요.
+                    </p>
+                  ) : (
                   <ResponsiveContainer width="100%" height={240}>
                     <AreaChart data={netWorthPoints.map((p) => ({ ...p, label: p.date }))}>
                       <defs>
@@ -303,7 +316,7 @@ export default function Assets() {
                           <stop offset="100%" stopColor="#4f6fc7" stopOpacity={0} />
                         </linearGradient>
                       </defs>
-                      <XAxis dataKey="label" tickLine={false} axisLine={false} />
+                      <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} padding={{ left: 16, right: 16 }} />
                       <YAxis tickFormatter={wonShort} tickLine={false} axisLine={false} width={52} />
                       <Tooltip formatter={(v: number) => won(v)} />
                       <Area
@@ -316,6 +329,7 @@ export default function Assets() {
                       />
                     </AreaChart>
                   </ResponsiveContainer>
+                  )}
                   {latestNW && latestNW.date && (
                     <>
                       <p className="muted" style={{ marginTop: 10, marginBottom: 6 }}>
@@ -378,7 +392,7 @@ export default function Assets() {
                         <stop offset="100%" stopColor="#41c690" stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <XAxis dataKey="month" tickLine={false} axisLine={false} />
+                    <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} padding={{ left: 16, right: 16 }} />
                     <YAxis tickFormatter={wonShort} tickLine={false} axisLine={false} width={52} />
                     <Tooltip formatter={(v: number) => won(v)} />
                     <Area type="monotone" dataKey="누적" stroke="#41c690" strokeWidth={2} fill="url(#inv)" />
@@ -396,7 +410,7 @@ export default function Assets() {
             {netWorthHistory.length === 0 ? (
               <Empty text="자산현황 탭에 계좌 잔액 스냅샷을 입력하면 여기 표시됩니다." />
             ) : (
-              <table className="tx-table">
+              <div className="table-scroll"><table className="tx-table">
                 <thead>
                   <tr>
                     <th>날짜</th>
@@ -429,7 +443,7 @@ export default function Assets() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </table></div>
             )}
           </div>
         </>
