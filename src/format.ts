@@ -65,6 +65,13 @@ export function nextMonth(ym: string): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
+// 이전 달의 YYYY-MM
+export function prevMonth(ym: string): string {
+  const [y, m] = ym.split("-").map(Number);
+  const d = new Date(y, m - 2, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
 // 해당 월의 일수
 export function daysInMonth(ym: string): number {
   const [y, m] = ym.split("-").map(Number);

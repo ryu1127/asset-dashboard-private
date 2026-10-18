@@ -19,6 +19,8 @@ import {
   datetimeLabel,
   lastMonths,
   monthRangeLabel,
+  nextMonth,
+  prevMonth,
   relativeTime,
   won,
   wonShort,
@@ -28,7 +30,6 @@ import {
   budgetVsActual,
   discoverMembers,
   expenseByCategory,
-  incomeVsActual,
   memberComparison,
   monthlyTrend,
   monthTransactions,
@@ -242,22 +243,6 @@ export default function Ledger() {
     });
   }, [monthTx, txCategoryFilter, txSubCategoryFilter, txSort]);
 
-  const [incomeSectionOpen, setIncomeSectionOpen] = useState(false);
-
-  const incomeGroups = useMemo(
-    () => (data ? incomeVsActual(data.transactions, data.incomeTargets, ym) : []),
-    [data, ym]
-  );
-  const incomeTotals = useMemo(() => {
-    let target = 0;
-    let actual = 0;
-    for (const g of incomeGroups) {
-      target += g.targetTotal;
-      actual += g.actualTotal;
-    }
-    return { target, actual };
-  }, [incomeGroups]);
-
   const byCategory = useMemo(
     () => (data ? expenseByCategory(data.transactions, ym, memberFilter, members) : []),
     [data, ym, memberFilter, members]
@@ -300,12 +285,26 @@ export default function Ledger() {
           </p>
         </div>
         <div className="dash-controls">
+          <button
+            className="btn-secondary sm"
+            aria-label="이전 달"
+            onClick={() => setYm(prevMonth(ym))}
+          >
+            ◀
+          </button>
           <input
             type="month"
             value={ym}
-            onChange={(e) => setYm(e.target.value)}
+            onChange={(e) => e.target.value && setYm(e.target.value)}
             style={{ width: "auto" }}
           />
+          <button
+            className="btn-secondary sm"
+            aria-label="다음 달"
+            onClick={() => setYm(nextMonth(ym))}
+          >
+            ▶
+          </button>
           <div className="seg">
             <button
               className={memberFilter === "all" ? "active" : ""}
@@ -487,73 +486,6 @@ export default function Ledger() {
                 </tbody>
               </table></div>
             )}
-          </div>
-
-          <div className="card">
-            <div className="budget-bar-head clickable" onClick={() => setIncomeSectionOpen((o) => !o)}>
-              <span>
-                <span className={"chevron" + (incomeSectionOpen ? " open" : "")}>▸</span>
-                이번 달 수입 목표 대비 실제
-              </span>
-              <span className="muted">
-                {won(incomeTotals.actual)} / {incomeTotals.target > 0 ? won(incomeTotals.target) : "목표 미설정"}
-              </span>
-            </div>
-            {incomeSectionOpen && (incomeGroups.length === 0 ? (
-              <Empty text="예산설정 탭 '수입 목표' 표를 채우면 여기 표시됩니다." />
-            ) : (
-              <div className="table-scroll"><table className="tx-table budget-table" style={{ marginTop: 16 }}>
-                <thead>
-                  <tr>
-                    <th>항목</th>
-                    <th className="right">실제</th>
-                    <th style={{ width: "34%" }}>달성률</th>
-                    <th className="right">목표</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {incomeGroups.map((g) => {
-                    const pct = g.targetTotal > 0 ? (g.actualTotal / g.targetTotal) * 100 : 0;
-                    const achieved = g.targetTotal > 0 && g.actualTotal >= g.targetTotal;
-                    return (
-                      <Fragment key={g.item}>
-                        <tr>
-                          <td>
-                            <b className={achieved ? "achieved-label" : ""}>{g.item}</b>
-                          </td>
-                          <td className={"right " + (achieved ? "achieved-label" : "")}>
-                            {won(g.actualTotal)}
-                          </td>
-                          <td>
-                            {g.targetTotal > 0 ? (
-                              <div className="progress">
-                                <div
-                                  className={"progress-fill " + (achieved ? "achieved" : "")}
-                                  style={{ width: Math.min(pct, 100) + "%" }}
-                                />
-                              </div>
-                            ) : (
-                              <span className="muted">목표 미설정</span>
-                            )}
-                          </td>
-                          <td className="right muted">
-                            {g.targetTotal > 0 ? won(g.targetTotal) : "—"}
-                          </td>
-                        </tr>
-                        {g.rows.map((r) => (
-                          <tr key={g.item + "|" + r.member} className="budget-child-row">
-                            <td>{r.member || "명의 미지정"}</td>
-                            <td className="right muted">{r.actual > 0 ? won(r.actual) : "—"}</td>
-                            <td />
-                            <td className="right muted">{r.target > 0 ? won(r.target) : "—"}</td>
-                          </tr>
-                        ))}
-                      </Fragment>
-                    );
-                  })}
-                </tbody>
-              </table></div>
-            ))}
           </div>
 
           {yearCompare && (
