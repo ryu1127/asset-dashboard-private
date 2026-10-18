@@ -18,6 +18,7 @@ import {
   currentMonth,
   datetimeLabel,
   lastMonths,
+  monthRangeLabel,
   relativeTime,
   won,
   wonShort,
@@ -295,6 +296,7 @@ export default function Ledger() {
           <h1>가계부</h1>
           <p className="muted">
             {settings.spreadsheetTitle} · {ym.replace("-", "년 ")}월 현황
+            {ym && <span> ({monthRangeLabel(ym)})</span>}
           </p>
         </div>
         <div className="dash-controls">

@@ -40,3 +40,20 @@ export function setTossStockConfig(config: TossStockConfig | null): void {
     localStorage.setItem(TOSSSTOCK_CONFIG_KEY, JSON.stringify(config));
   }
 }
+
+const CYCLE_START_DAY_KEY = "cycleStartDay";
+export const DEFAULT_CYCLE_START_DAY = 25;
+
+// 가계부 월의 시작일(1~28). 1이면 달력 기준.
+export function getCycleStartDay(): number {
+  try {
+    const n = Number(localStorage.getItem(CYCLE_START_DAY_KEY));
+    return Number.isInteger(n) && n >= 1 && n <= 28 ? n : DEFAULT_CYCLE_START_DAY;
+  } catch {
+    return DEFAULT_CYCLE_START_DAY;
+  }
+}
+
+export function setCycleStartDay(day: number): void {
+  localStorage.setItem(CYCLE_START_DAY_KEY, String(day));
+}

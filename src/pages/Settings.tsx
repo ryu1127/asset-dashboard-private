@@ -12,7 +12,9 @@ import {
 import { DEFAULT_SPREADSHEET_URL } from "../config";
 import { isSignedIn, signIn, signOut } from "../drive";
 import {
+  getCycleStartDay,
   getNetWorthGoal,
+  setCycleStartDay,
   getTossStockConfig,
   setNetWorthGoal,
   setTossStockConfig,
@@ -30,6 +32,7 @@ export default function Settings() {
   const [connectError, setConnectError] = useState<string | null>(null);
   const [legacy, setLegacy] = useState<string | null>(null);
   const [goalInput, setGoalInput] = useState(() => getNetWorthGoal()?.toLocaleString() ?? "");
+  const [cycleDay, setCycleDay] = useState(() => getCycleStartDay());
   const [tossConfig, setTossConfigState] = useState<TossStockConfig | null>(() =>
     getTossStockConfig()
   );
@@ -261,6 +264,32 @@ export default function Settings() {
             style={{ flex: 1 }}
           />
           <span className="muted">원</span>
+        </div>
+      </div>
+
+      <div className="card">
+        <h3>📅 가계부 월 시작일</h3>
+        <p className="muted">
+          급여일처럼 한 달이 시작되는 날이에요. 25일이면 9월 25일~10월 24일이 10월로 집계돼요.
+          1일로 두면 달력 기준이에요.
+        </p>
+        <div className="row" style={{ gap: 8, alignItems: "center" }}>
+          <select
+            value={cycleDay}
+            onChange={(e) => {
+              const d = Number(e.target.value);
+              setCycleDay(d);
+              setCycleStartDay(d);
+              window.location.reload();
+            }}
+            style={{ width: "auto" }}
+          >
+            {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
+              <option key={d} value={d}>
+                {d}일
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 

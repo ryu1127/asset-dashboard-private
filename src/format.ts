@@ -1,3 +1,5 @@
+import { getCycleStartDay } from "./prefs";
+
 export function won(n: number): string {
   return "₩" + Math.round(n).toLocaleString("ko-KR");
 }
@@ -16,21 +18,34 @@ export function todayISO(): string {
   return new Date(d.getTime() - off * 60000).toISOString().slice(0, 10);
 }
 
+// 가계부 월 키(YYYY-MM). 시작일이 25일이면 9/25~10/24 가 "2026-10".
 export function monthOf(dateISO: string): string {
-  return dateISO.slice(0, 7); // YYYY-MM
+  const day = Number(dateISO.slice(8, 10));
+  const startDay = getCycleStartDay();
+  if (startDay > 1 && day >= startDay) return nextMonth(dateISO.slice(0, 7));
+  return dateISO.slice(0, 7);
 }
 
 export function currentMonth(): string {
-  return todayISO().slice(0, 7);
+  return monthOf(todayISO());
+}
+
+// 가계부 월의 시작일~종료일 라벨. 예: "9월 25일 ~ 10월 24일"
+export function monthRangeLabel(ym: string): string {
+  const startDay = getCycleStartDay();
+  const [y, m] = ym.split("-").map(Number);
+  if (!y || !m) return "";
+  if (startDay <= 1) return `${m}월 1일 ~ ${m}월 ${daysInMonth(ym)}일`;
+  const prev = new Date(y, m - 2, 1);
+  return `${prev.getMonth() + 1}월 ${startDay}일 ~ ${m}월 ${startDay - 1}일`;
 }
 
 // 최근 n개월의 YYYY-MM 배열 (오래된 → 최신)
 export function lastMonths(n: number): string[] {
   const out: string[] = [];
-  const d = new Date();
-  d.setDate(1);
+  const [cy, cm] = currentMonth().split("-").map(Number);
   for (let i = n - 1; i >= 0; i--) {
-    const m = new Date(d.getFullYear(), d.getMonth() - i, 1);
+    const m = new Date(cy, cm - 1 - i, 1);
     out.push(
       `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, "0")}`
     );
