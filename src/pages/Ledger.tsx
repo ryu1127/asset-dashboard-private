@@ -26,7 +26,6 @@ import {
   wonShort,
 } from "../format";
 import {
-  budgetAllocation,
   budgetVsActual,
   discoverMembers,
   expenseByCategory,
@@ -189,15 +188,6 @@ export default function Ledger() {
       allBudgetCatsExpanded ? new Set() : new Set(budgetGroups.map((g) => g.category))
     );
   }
-
-  const allocation = useMemo(
-    () => (data ? budgetAllocation(data.budgetItems) : []),
-    [data]
-  );
-  const allocationTotal = useMemo(
-    () => allocation.reduce((sum, a) => sum + a.total, 0),
-    [allocation]
-  );
 
   // 대분류가 "용돈"인 거래는 허용된 계정으로 로그인했을 때만 거래내역에 보인다(확인 전·실패 시 숨김).
   const [accountEmail, setAccountEmail] = useState<string | null>(null);
@@ -427,6 +417,10 @@ export default function Ledger() {
               <div className={"kpi-value " + (summary.saving >= 0 ? "income" : "expense")}>
                 {won(summary.saving)}
               </div>
+              <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                수입 − 소비. 저축·투자 기록 {won(summary.invested)} + 그 외 {won(summary.saving - summary.invested)}
+                (통장에 남았거나 가계부에 안 적은 돈)
+              </div>
             </div>
             <div className="kpi">
               <div className="kpi-label">소비 후 저축 가능률</div>
@@ -435,34 +429,6 @@ export default function Ledger() {
               </div>
             </div>
           </section>
-
-          <div className="card">
-            <h3>예산 구성</h3>
-            <p className="muted" style={{ marginTop: -8, marginBottom: 12 }}>
-              예산설정 탭에 잡아둔 월 총 {won(allocationTotal)} 중 대분류별 비중이에요
-              (월별 실제 지출과는 무관한, 설정 자체의 구성).
-            </p>
-            {allocation.length === 0 ? (
-              <Empty text="예산설정 탭에 예산을 입력하면 여기 표시됩니다." />
-            ) : (
-              <div className="alloc-list">
-                {allocation.map((a) => (
-                  <div key={a.category} className="alloc-row">
-                    <span className="dot" style={{ background: colorFor(a.category) }} />
-                    <span className="alloc-name">{a.category}</span>
-                    <div className="progress">
-                      <div
-                        className="progress-fill"
-                        style={{ width: a.percent + "%", background: colorFor(a.category) }}
-                      />
-                    </div>
-                    <span className="alloc-pct muted">{Math.round(a.percent)}%</span>
-                    <span className="alloc-amt muted">{won(a.total)}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
 
           <div className="card">
             <div className="budget-bar-head">

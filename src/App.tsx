@@ -6,6 +6,7 @@ import { NavLink, Navigate, Route, Routes } from "react-router-dom";
 // 정리 대기 목록: DriveBar 자체를 없앨지, 설정 화면 안으로 옮길지 결정하기.
 // import DriveBar from "./components/DriveBar";
 import Assets from "./pages/Assets";
+import Budget from "./pages/Budget";
 import Ledger from "./pages/Ledger";
 import Settings from "./pages/Settings";
 
@@ -43,6 +44,9 @@ export default function App() {
             <NavLink to="/assets" className="nav-item">
               <span>📈</span> 자산
             </NavLink>
+            <NavLink to="/budget" className="nav-item">
+              <span>🧮</span> 예산
+            </NavLink>
             <NavLink to="/settings" className="nav-item">
               <span>⚙️</span> 설정
             </NavLink>
@@ -66,6 +70,7 @@ export default function App() {
           <Route path="/" element={<Navigate to="/ledger" replace />} />
           <Route path="/ledger" element={<Ledger />} />
           <Route path="/assets" element={<Assets />} />
+          <Route path="/budget" element={<Budget />} />
           <Route path="/settings" element={<Settings />} />
         </Routes>
       </main>
