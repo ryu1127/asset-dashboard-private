@@ -81,8 +81,8 @@ function sortArrow(active: boolean, dir: "asc" | "desc"): string {
 export default function Ledger() {
   const { settings, data, loading, error, signedIn, refresh, connectAndSync } =
     useSheetData();
-  // 실시간 반영이 늦어 지난달 데이터를 주로 보게 되므로, 처음엔 전달을 보여준다.
-  const [ym, setYm] = useState(() => prevMonth(currentMonth()));
+  // 백업 자동 동기화로 시트가 거의 실시간으로 채워지므로, 처음엔 이번 달을 보여준다.
+  const [ym, setYm] = useState(currentMonth());
   const [memberFilter, setMemberFilter] = useState<string | "all">("all");
 
   const members = useMemo(() => (data ? discoverMembers(data) : []), [data]);
