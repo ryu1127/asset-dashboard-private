@@ -108,7 +108,7 @@ export default function Ledger() {
     () =>
       data
         ? summarizeMonth(data.transactions, ym, memberFilter, members)
-        : { income: 0, expense: 0, saving: 0, savingRate: null },
+        : { income: 0, expense: 0, invested: 0, saving: 0, savingRate: null },
     [data, ym, memberFilter, members]
   );
 
@@ -145,6 +145,20 @@ export default function Ledger() {
     () => (data ? budgetVsActual(data.transactions, data.budgetItems, ym) : []),
     [data, ym]
   );
+  const savingGroups = useMemo(
+    () => (data ? budgetVsActual(data.transactions, data.budgetItems, ym, "저축·투자") : []),
+    [data, ym]
+  );
+  const savingTotals = useMemo(() => {
+    let budget = 0;
+    let actual = 0;
+    for (const g of savingGroups) {
+      budget += g.budget;
+      actual += g.actual;
+    }
+    return { budget, actual };
+  }, [savingGroups]);
+
   const budgetTotals = useMemo(() => {
     let budget = 0;
     let actual = 0;
@@ -380,17 +394,21 @@ export default function Ledger() {
               <div className="kpi-value income">{won(summary.income)}</div>
             </div>
             <div className="kpi">
-              <div className="kpi-label">이번 달 지출</div>
+              <div className="kpi-label">이번 달 소비 (저축·투자 제외)</div>
               <div className="kpi-value expense">{won(summary.expense)}</div>
             </div>
             <div className="kpi">
-              <div className="kpi-label">이번 달 저축</div>
+              <div className="kpi-label">이번 달 저축·투자</div>
+              <div className="kpi-value">{won(summary.invested)}</div>
+            </div>
+            <div className="kpi">
+              <div className="kpi-label">소비 후 남은 금액</div>
               <div className={"kpi-value " + (summary.saving >= 0 ? "income" : "expense")}>
                 {won(summary.saving)}
               </div>
             </div>
             <div className="kpi">
-              <div className="kpi-label">저축률</div>
+              <div className="kpi-label">소비 후 저축 가능률</div>
               <div className="kpi-value">
                 {summary.savingRate != null ? Math.round(summary.savingRate * 100) + "%" : "—"}
               </div>
@@ -427,7 +445,7 @@ export default function Ledger() {
 
           <div className="card">
             <div className="budget-bar-head">
-              <span>이번 달 예산 대비 지출</span>
+              <span>이번 달 소비 예산 대비 실제 소비 (저축·투자 제외)</span>
               <span className={budgetTotals.actual > budgetTotals.budget ? "expense" : "muted"}>
                 {won(budgetTotals.actual)} / {won(budgetTotals.budget)}
               </span>
@@ -534,6 +552,52 @@ export default function Ledger() {
             )}
           </div>
 
+          {savingGroups.length > 0 && (
+            <div className="card">
+              <div className="budget-bar-head">
+                <span>이번 달 저축·투자 목표 대비 기록된 금액</span>
+                <span className="muted">
+                  {won(savingTotals.actual)} / {won(savingTotals.budget)}
+                </span>
+              </div>
+              <p className="muted" style={{ marginTop: 4 }}>
+                가계부에 기록된 거래만 집계해요. 가계부에 입력하지 않은 투자·저축 입금은 0원으로
+                보이니, 달성률은 실제보다 낮게 나올 수 있어요.
+              </p>
+              <div className="table-scroll">
+                <table className="tx-table" style={{ marginTop: 8 }}>
+                  <thead>
+                    <tr>
+                      <th>분류</th>
+                      <th className="right">기록된 금액</th>
+                      <th className="right">목표</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {savingGroups.flatMap((g) =>
+                      g.rows.map((r) => (
+                        <tr
+                          key={g.category + "|" + r.subCategory}
+                          className={r.actual > 0 ? "clickable" : undefined}
+                          title={r.actual > 0 ? "눌러서 이 항목의 거래내역 보기" : undefined}
+                          onClick={
+                            r.actual > 0 ? () => showTransactionsOf(g.category, r.subCategory) : undefined
+                          }
+                        >
+                          <td>
+                            {g.category} › {r.subCategory}
+                          </td>
+                          <td className="right">{r.actual > 0 ? won(r.actual) : "—"}</td>
+                          <td className="right muted">{r.budget > 0 ? won(r.budget) : "—"}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           {yearCompare && (
             <div className="card">
               <h3>
@@ -608,7 +672,7 @@ export default function Ledger() {
 
           <section className="grid-2">
             <div className="card">
-              <h3>최근 6개월 수입 vs 지출</h3>
+              <h3>최근 6개월 수입 · 소비 · 저축·투자</h3>
               <ResponsiveContainer width="100%" height={260}>
                 <BarChart data={trend}>
                   <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} />
@@ -616,7 +680,8 @@ export default function Ledger() {
                   <Tooltip formatter={(v: number) => won(v)} />
                   <Legend />
                   <Bar dataKey="수입" fill="#4f6fc7" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="지출" fill="#bd4563" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="지출" name="소비" fill="#bd4563" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="저축투자" name="저축·투자" fill="#41c690" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

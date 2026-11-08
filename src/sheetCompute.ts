@@ -47,9 +47,19 @@ function matchesMemberFilter(
   return ownerOf(t, members) === memberFilter;
 }
 
+// 대분류가 저축/투자인 거래는 "소비"에서 빼서 따로 센다. 시트의 수입/지출 구분은 그대로 두고
+// 화면에서만 나눠 보는 것이라 시트·동기화에는 영향이 없다.
+const INVESTMENT_CATEGORIES = new Set(["투자", "저축"]);
+export function isSavingCategory(category: string): boolean {
+  return INVESTMENT_CATEGORIES.has(category);
+}
+
 export interface MonthSummary {
   income: number;
+  // 소비(저축·투자 제외 지출)
   expense: number;
+  // 저축·투자로 나간 금액
+  invested: number;
   saving: number;
   savingRate: number | null;
 }
@@ -74,20 +84,24 @@ export function summarizeMonth(
 ): MonthSummary {
   let income = 0;
   let expense = 0;
+  let invested = 0;
   for (const t of txs) {
     if (monthOf(t.date) !== ym) continue;
     if (!matchesMemberFilter(t, memberFilter, members)) continue;
     if (t.kind === "수입") income += t.amountKRW;
+    else if (isSavingCategory(t.category)) invested += t.amountKRW;
     else expense += t.amountKRW;
   }
+  // saving: 소비하고 남은 금액(저축·투자로 보낸 돈은 남은 금액에 포함)
   const saving = income - expense;
-  return { income, expense, saving, savingRate: income > 0 ? saving / income : null };
+  return { income, expense, invested, saving, savingRate: income > 0 ? saving / income : null };
 }
 
 export interface MonthPoint {
   month: string;
   수입: number;
   지출: number;
+  저축투자: number;
 }
 
 export function monthlyTrend(
@@ -97,13 +111,14 @@ export function monthlyTrend(
   members: string[]
 ): MonthPoint[] {
   const base = new Map<string, MonthPoint>(
-    months.map((m) => [m, { month: monthLabel(m), 수입: 0, 지출: 0 }])
+    months.map((m) => [m, { month: monthLabel(m), 수입: 0, 지출: 0, 저축투자: 0 }])
   );
   for (const t of txs) {
     const b = base.get(monthOf(t.date));
     if (!b) continue;
     if (!matchesMemberFilter(t, memberFilter, members)) continue;
     if (t.kind === "수입") b.수입 += t.amountKRW;
+    else if (isSavingCategory(t.category)) b.저축투자 += t.amountKRW;
     else b.지출 += t.amountKRW;
   }
   return months.map((m) => base.get(m)!);
@@ -125,17 +140,20 @@ export interface CategoryBudgetGroup {
 export function budgetVsActual(
   txs: SheetTransaction[],
   budgetItems: SheetBudgetItem[],
-  ym: string
+  ym: string,
+  scope: "소비" | "저축·투자" = "소비"
 ): CategoryBudgetGroup[] {
+  const inScope = (category: string) => isSavingCategory(category) === (scope === "저축·투자");
   const actualMap = new Map<string, number>();
   for (const t of txs) {
-    if (t.kind !== "지출" || monthOf(t.date) !== ym) continue;
+    if (t.kind !== "지출" || monthOf(t.date) !== ym || !inScope(t.category)) continue;
     const key = `${t.category}|${t.subCategory}`;
     actualMap.set(key, (actualMap.get(key) ?? 0) + t.amountKRW);
   }
 
   const groups = new Map<string, CategoryBudgetGroup>();
   for (const b of budgetItems) {
+    if (!inScope(b.category)) continue;
     const key = `${b.category}|${b.subCategory}`;
     const actual = actualMap.get(key) ?? 0;
     actualMap.delete(key);
@@ -200,7 +218,7 @@ export function expenseByCategory(
 ): CategorySlice[] {
   const map = new Map<string, number>();
   for (const t of txs) {
-    if (t.kind !== "지출" || monthOf(t.date) !== ym) continue;
+    if (t.kind !== "지출" || monthOf(t.date) !== ym || isSavingCategory(t.category)) continue;
     if (!matchesMemberFilter(t, memberFilter, members)) continue;
     map.set(t.category, (map.get(t.category) ?? 0) + t.amountKRW);
   }
@@ -227,13 +245,11 @@ export function memberComparison(
       if (monthOf(t.date) !== ym) continue;
       if (ownerOf(t, members) !== mem) continue;
       if (t.kind === "수입") income += t.amountKRW;
-      else expense += t.amountKRW;
+      else if (!isSavingCategory(t.category)) expense += t.amountKRW;
     }
     return { name: mem, 수입: income, 지출: expense };
   });
 }
-
-const INVESTMENT_CATEGORIES = new Set(["투자", "저축"]);
 
 export interface InvestmentPoint {
   month: string;
@@ -408,7 +424,7 @@ export function yearSummary(txs: SheetTransaction[], year: string): YearSummary 
   for (const t of txs) {
     if (!t.date.startsWith(year)) continue;
     if (t.kind === "수입") income += t.amountKRW;
-    else expense += t.amountKRW;
+    else if (!isSavingCategory(t.category)) expense += t.amountKRW;
   }
   return { year, income, expense, saving: income - expense };
 }
