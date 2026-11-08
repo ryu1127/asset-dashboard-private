@@ -351,3 +351,117 @@ function parseAssetSnapshots(rows: Row[]): SheetAssetSnapshotRow[] {
   }
   return out;
 }
+
+
+// 0-based 열 인덱스를 A1 표기 열 문자(A, B, ..., Z, AA...)로 변환한다.
+function colLetter(idx: number): string {
+  let n = idx + 1;
+  let out = "";
+  while (n > 0) {
+    const rem = (n - 1) % 26;
+    out = String.fromCharCode(65 + rem) + out;
+    n = Math.floor((n - 1) / 26);
+  }
+  return out;
+}
+
+export interface BudgetAmountChange {
+  category: string;
+  subCategory: string;
+  prevBudget: number;
+  nextBudget: number;
+}
+
+export interface SaveBudgetResult {
+  updatedCount: number;
+  conflicts: { category: string; subCategory: string; sheetValue: number; expectedValue: number }[];
+  missing: { category: string; subCategory: string }[];
+}
+
+// 예산설정 탭의 소분류별 월예산 숫자 셀만 안전하게 갱신한다.
+// - 저장 직전에 예산설정!A1:H200을 다시 읽어 각 (대분류, 소분류) 행 위치와 현재 시트 값을 확인한다.
+// - force가 false일 때 시트 현재 값이 prevBudget과 다르면 덮어쓰지 않고 conflicts로 돌려준다.
+// - D/E/F열 수식이나 표 구조(행 추가/삭제)는 건드리지 않고 월예산 열의 해당 셀만 batchUpdate한다.
+export async function updateBudgetAmounts(
+  spreadsheetId: string,
+  changes: BudgetAmountChange[],
+  opts?: { force?: boolean }
+): Promise<SaveBudgetResult> {
+  if (changes.length === 0) return { updatedCount: 0, conflicts: [], missing: [] };
+  const tabs = await batchGetValues(spreadsheetId, ["예산설정!A1:H200"]);
+  const rows = tabs["예산설정"] ?? [];
+  const headerIdx = findHeaderRow(rows, ["대분류", "소분류", "월예산"]);
+  if (headerIdx === -1) {
+    throw new Error("시트의 '예산설정' 탭에서 (대분류 / 소분류 / 월예산) 표를 찾지 못했습니다.");
+  }
+  const header = rows[headerIdx];
+  const catIdx = colIndex(header, "대분류");
+  const subIdx = colIndex(header, "소분류");
+  const amtIdx = colIndex(header, "월예산");
+  if (catIdx < 0 || subIdx < 0 || amtIdx < 0) {
+    throw new Error("예산설정 탭의 열 머리글(대분류/소분류/월예산)을 찾지 못했습니다.");
+  }
+
+  const rowMap = new Map<string, { rowNumber: number; currentBudget: number }>();
+  let lastCategory = "";
+  for (let i = headerIdx + 1; i < rows.length; i++) {
+    const sub = cellStr(rows[i], subIdx);
+    const catRaw = cellStr(rows[i], catIdx);
+    if (!sub && !catRaw) break;
+    const cat = catRaw || lastCategory;
+    lastCategory = cat;
+    rowMap.set(`${cat}|${sub}`, {
+      rowNumber: i + 1, // 1-based sheet row
+      currentBudget: cellNum(rows[i], amtIdx),
+    });
+  }
+
+  const conflicts: SaveBudgetResult["conflicts"] = [];
+  const missing: SaveBudgetResult["missing"] = [];
+  const updates: { range: string; values: number[][] }[] = [];
+  const amtCol = colLetter(amtIdx);
+
+  for (const ch of changes) {
+    const key = `${ch.category}|${ch.subCategory}`;
+    const found = rowMap.get(key);
+    if (!found) {
+      missing.push({ category: ch.category, subCategory: ch.subCategory });
+      continue;
+    }
+    if (!opts?.force && found.currentBudget !== ch.prevBudget) {
+      conflicts.push({
+        category: ch.category,
+        subCategory: ch.subCategory,
+        sheetValue: found.currentBudget,
+        expectedValue: ch.prevBudget,
+      });
+      continue;
+    }
+    updates.push({
+      range: `예산설정!${amtCol}${found.rowNumber}`,
+      values: [[Math.max(0, Math.round(ch.nextBudget))]],
+    });
+  }
+
+  if (conflicts.length > 0 || missing.length > 0) {
+    return { updatedCount: 0, conflicts, missing };
+  }
+
+  if (updates.length > 0) {
+    const token = requireToken();
+    const res = await fetch(`${SHEETS_API}/${spreadsheetId}/values:batchUpdate`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        valueInputOption: "USER_ENTERED",
+        data: updates,
+      }),
+    });
+    if (!res.ok) throw new Error(await sheetErrorMessage(res));
+  }
+
+  return { updatedCount: updates.length, conflicts: [], missing: [] };
+}

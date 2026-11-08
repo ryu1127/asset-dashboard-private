@@ -5,10 +5,10 @@
 
 const CLIENT_ID =
   "1030627223748-dtferlqfodgm5mo25im7jhs95kasu0p4.apps.googleusercontent.com";
-// drive.file: 앱이 만든 백업 파일만 접근. spreadsheets.readonly: 사용자가
-// 연결한 가계부 시트를 읽기 전용으로 읽기 위해 추가.
+// drive.file: 앱이 만든 백업 파일만 접근. spreadsheets: 사용자가 연결한 가계부 시트를
+// 읽고, 예산설정 등 대시보드에서 수정한 셀을 시트에 반영하기 위해 사용한다.
 const SCOPE =
-  "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets.readonly";
+  "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets";
 const BACKUP_FILENAME = "asset-dashboard-backup.json";
 const LAST_SAVED_KEY = "driveLastSavedAt";
 const TOKEN_KEY = "driveToken";

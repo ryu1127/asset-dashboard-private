@@ -51,7 +51,7 @@ export default function App() {
               <span>⚙️</span> 설정
             </NavLink>
           </nav>
-          <div className="sidebar-foot">구글 시트 기반 · 읽기 전용</div>
+          <div className="sidebar-foot">구글 시트 연동</div>
         </aside>
       )}
 
