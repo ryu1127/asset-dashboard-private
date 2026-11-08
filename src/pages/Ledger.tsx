@@ -29,7 +29,6 @@ import {
   budgetVsActual,
   discoverMembers,
   expenseByCategory,
-  memberComparison,
   monthlyTrend,
   monthTransactions,
   savingsRateTrend,
@@ -294,11 +293,6 @@ export default function Ledger() {
   const byCategory = useMemo(
     () => (data ? expenseByCategory(data.transactions, ym, memberFilter, members) : []),
     [data, ym, memberFilter, members]
-  );
-
-  const byMember = useMemo(
-    () => (data ? memberComparison(data.transactions, ym, members) : []),
-    [data, ym, members]
   );
 
   const yearCompare = useMemo(() => {
@@ -739,24 +733,7 @@ export default function Ledger() {
               )}
             </div>
 
-            {members.length > 0 && (
-              <div className="card">
-                <h3>구성원별 이번 달 수입</h3>
-                <p className="muted" style={{ marginTop: -8, marginBottom: 12 }}>
-                  거래내역 탭의 "명의" 열에 이름을 적은 수입만 집계돼요. 명의를 비워둔
-                  수입은 여기엔 안 잡히고 "부부 합산"에만 들어가요. 지출은 용돈처럼
-                  소분류가 "용돈_이름"인 항목만 명의로 나뉘어요.
-                </p>
-                <ResponsiveContainer width="100%" height={240}>
-                  <BarChart data={byMember}>
-                    <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} />
-                    <YAxis tickFormatter={wonShort} tickLine={false} axisLine={false} width={48} />
-                    <Tooltip formatter={(v: number) => won(v)} />
-                    <Bar dataKey="수입" fill="#4f6fc7" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            )}
+
           </section>
 
           <div className="card tx-card" ref={txCardRef}>
