@@ -147,7 +147,9 @@ export function budgetVsActual(
   const actualMap = new Map<string, number>();
   for (const t of txs) {
     if (t.kind !== "지출" || monthOf(t.date) !== ym || !inScope(t.category)) continue;
-    const key = `${t.category}|${t.subCategory}`;
+    // 소분류가 비어 있는 거래는 예산설정의 "미분류" 소분류 줄로 짝지어 준다
+    // (예: 대분류만 "용돈"인 지출이 예산 표의 용돈 › 미분류에 잡히도록).
+    const key = `${t.category}|${t.subCategory || "미분류"}`;
     actualMap.set(key, (actualMap.get(key) ?? 0) + t.amountKRW);
   }
 

@@ -280,7 +280,11 @@ export default function Ledger() {
     let rows = monthTx;
     if (txCategoryFilter !== "all") rows = rows.filter((t) => t.category === txCategoryFilter);
     if (txSubCategoryFilter !== "all") {
-      rows = rows.filter((t) => t.subCategory === txSubCategoryFilter);
+      rows = rows.filter(
+        (t) =>
+          t.subCategory === txSubCategoryFilter ||
+          (txSubCategoryFilter === "미분류" && !t.subCategory)
+      );
     }
     const dir = txSort.dir === "asc" ? 1 : -1;
     return [...rows].sort((a, b) => {
