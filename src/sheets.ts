@@ -465,3 +465,165 @@ export async function updateBudgetAmounts(
 
   return { updatedCount: updates.length, conflicts: [], missing: [] };
 }
+
+
+export interface SaveAssetSnapshotResult {
+  mode: "appended" | "replaced" | "conflict";
+  existingRowCount: number;
+  writtenRowCount: number;
+  startRow: number;
+}
+
+// 자산현황 탭(A~F열: 스냅샷일자 | 명의 | 계좌/자산명 | 종류 | 잔액(원) | 메모)에
+// 특정 날짜(date)의 스냅샷 묶음을 저장한다.
+// - 우측 요약 수식 패널(H열~)을 건드리지 않기 위해 A~F열만 읽고 쓴다.
+// - 같은 날짜(date)의 행이 이미 시트에 있을 때 overwriteSameDate가 false면 conflict를 돌려주어
+//   화면에서 덮어쓸지 확인받게 한다.
+// - overwriteSameDate가 true면 기존 A~F 데이터에서 해당 날짜 행만 새 행들로 교체해 A4:F...에 다시 쓴다.
+// - 같은 날짜가 없으면 마지막 데이터 행 바로 아래에 이어서 쓴다.
+export async function saveAssetSnapshotToSheet(
+  spreadsheetId: string,
+  date: string,
+  items: Omit<SheetAssetSnapshotRow, "date">[],
+  opts?: { overwriteSameDate?: boolean }
+): Promise<SaveAssetSnapshotResult> {
+  const cleanItems = items
+    .map((it) => ({
+      date,
+      member: it.member.trim() || "공동",
+      name: it.name.trim(),
+      type: it.type.trim() || "예금",
+      // 종류가 '대출'이면 양수로 입력했더라도 시트 관례에 맞게 음수로 맞춘다.
+      balance:
+        it.type.trim() === "대출" && it.balance > 0
+          ? -Math.round(it.balance)
+          : Math.round(it.balance),
+      memo: it.memo.trim(),
+    }))
+    .filter((it) => it.name !== "");
+
+  if (cleanItems.length === 0) {
+    throw new Error("저장할 계좌 항목이 없습니다. 계좌명을 한 개 이상 입력해 주세요.");
+  }
+
+  const tabs = await batchGetValues(spreadsheetId, ["자산현황!A1:F3000"]);
+  const rows = tabs["자산현황"] ?? [];
+  const headerIdx = findHeaderRow(rows, ["스냅샷일자", "명의", "계좌", "잔액"]);
+  if (headerIdx === -1) {
+    throw new Error("시트의 '자산현황' 탭에서 머리글(스냅샷일자/명의/계좌/잔액)을 찾지 못했습니다.");
+  }
+
+  const header = rows[headerIdx];
+  const dateIdx = colIndex(header, "스냅샷일자");
+  const memberIdx = colIndex(header, "명의");
+  const nameIdx = colIndex(header, "계좌");
+  const typeIdx = colIndex(header, "종류");
+  const balanceIdx = colIndex(header, "잔액");
+  const memoIdx = colIndex(header, "메모");
+
+  const existingAll: SheetAssetSnapshotRow[] = [];
+  let lastDataRowIdx = headerIdx; // 0-based
+  for (let i = headerIdx + 1; i < rows.length; i++) {
+    const d = cellDate(rows[i], dateIdx);
+    const nm = cellStr(rows[i], nameIdx);
+    if (!d && !nm) continue;
+    lastDataRowIdx = i;
+    if (!d) continue;
+    existingAll.push({
+      date: d,
+      member: cellStr(rows[i], memberIdx),
+      name: nm,
+      type: cellStr(rows[i], typeIdx),
+      balance: cellNum(rows[i], balanceIdx),
+      memo: cellStr(rows[i], memoIdx),
+    });
+  }
+
+  const sameDateCount = existingAll.filter((r) => r.date === date).length;
+  if (sameDateCount > 0 && !opts?.overwriteSameDate) {
+    return {
+      mode: "conflict",
+      existingRowCount: sameDateCount,
+      writtenRowCount: 0,
+      startRow: 0,
+    };
+  }
+
+  const toRowValues = (r: SheetAssetSnapshotRow): (string | number)[] => [
+    r.date,
+    r.member,
+    r.name,
+    r.type,
+    r.balance,
+    r.memo,
+  ];
+
+  const token = requireToken();
+
+  if (sameDateCount === 0) {
+    // 마지막 데이터 행 바로 아래에 새 스냅샷 행들을 추가
+    const startRow = lastDataRowIdx + 2; // 1-based sheet row
+    const endRow = startRow + cleanItems.length - 1;
+    const range = `자산현황!A${startRow}:F${endRow}`;
+    const res = await fetch(
+      `${SHEETS_API}/${spreadsheetId}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`,
+      {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          range,
+          majorDimension: "ROWS",
+          values: cleanItems.map(toRowValues),
+        }),
+      }
+    );
+    if (!res.ok) throw new Error(await sheetErrorMessage(res));
+    return {
+      mode: "appended",
+      existingRowCount: 0,
+      writtenRowCount: cleanItems.length,
+      startRow,
+    };
+  }
+
+  // 같은 날짜의 기존 스냅샷을 새 항목들로 교체 (날짜 오름차순 유지, A~F열만 갱신)
+  const kept = existingAll.filter((r) => r.date !== date);
+  const merged = [...kept, ...cleanItems].sort((a, b) => a.date.localeCompare(b.date));
+  const firstDataRow = headerIdx + 2; // 1-based (보통 4행)
+  const totalRowsToCover = Math.max(lastDataRowIdx - headerIdx, merged.length);
+  const paddedValues: (string | number)[][] = [];
+  for (let i = 0; i < totalRowsToCover; i++) {
+    if (i < merged.length) {
+      paddedValues.push(toRowValues(merged[i]));
+    } else {
+      paddedValues.push(["", "", "", "", "", ""]);
+    }
+  }
+  const endRow = firstDataRow + totalRowsToCover - 1;
+  const range = `자산현황!A${firstDataRow}:F${endRow}`;
+  const res = await fetch(
+    `${SHEETS_API}/${spreadsheetId}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`,
+    {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        range,
+        majorDimension: "ROWS",
+        values: paddedValues,
+      }),
+    }
+  );
+  if (!res.ok) throw new Error(await sheetErrorMessage(res));
+  return {
+    mode: "replaced",
+    existingRowCount: sameDateCount,
+    writtenRowCount: cleanItems.length,
+    startRow: firstDataRow,
+  };
+}
