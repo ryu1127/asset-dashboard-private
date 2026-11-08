@@ -878,6 +878,25 @@ select:focus {
 .budget-group-row:hover {
   background: var(--bg);
 }
+.budget-child-row.clickable {
+  cursor: pointer;
+}
+.budget-child-row.clickable:hover {
+  background: var(--bg);
+}
+.link-btn.amt-link {
+  font-size: inherit;
+  font-weight: inherit;
+  color: inherit;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+.link-btn.amt-link:hover {
+  color: var(--primary);
+}
+.tx-card {
+  scroll-margin-top: 12px;
+}
 .chevron {
   display: inline-block;
   width: 14px;

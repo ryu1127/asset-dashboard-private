@@ -42,7 +42,7 @@ export function setTossStockConfig(config: TossStockConfig | null): void {
 }
 
 const CYCLE_START_DAY_KEY = "cycleStartDay";
-export const DEFAULT_CYCLE_START_DAY = 25;
+export const DEFAULT_CYCLE_START_DAY = 1;
 
 // 가계부 월의 시작일(1~28). 1이면 달력 기준.
 export function getCycleStartDay(): number {

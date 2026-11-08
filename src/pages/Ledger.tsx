@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -81,7 +81,8 @@ function sortArrow(active: boolean, dir: "asc" | "desc"): string {
 export default function Ledger() {
   const { settings, data, loading, error, signedIn, refresh, connectAndSync } =
     useSheetData();
-  const [ym, setYm] = useState(currentMonth());
+  // 실시간 반영이 늦어 지난달 데이터를 주로 보게 되므로, 처음엔 전달을 보여준다.
+  const [ym, setYm] = useState(() => prevMonth(currentMonth()));
   const [memberFilter, setMemberFilter] = useState<string | "all">("all");
 
   const members = useMemo(() => (data ? discoverMembers(data) : []), [data]);
@@ -197,10 +198,32 @@ export default function Ledger() {
 
   // 달/구성원이 바뀌면 목록 자체가 달라지니, 이전 필터가 더 이상 말이 안
   // 될 수 있어 초기화한다.
+  // 예산 표에서 항목을 눌러 이동할 때는 방금 맞춘 필터를 지우지 않는다.
+  const keepTxFilters = useRef(false);
+  const txCardRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
+    if (keepTxFilters.current) {
+      keepTxFilters.current = false;
+      return;
+    }
     setTxCategoryFilter("all");
     setTxSubCategoryFilter("all");
   }, [ym, memberFilter]);
+
+  // 예산 대비 지출 표의 항목을 누르면 아래 거래내역을 그 분류로 걸러서 보여준다.
+  // 예산 표의 실제 지출은 구성원 필터와 무관하므로, 금액이 맞게 구성원 필터도 '전체'로 돌린다.
+  function showTransactionsOf(category: string, subCategory: string | null) {
+    if (memberFilter !== "all") {
+      keepTxFilters.current = true;
+      setMemberFilter("all");
+    }
+    setTxCategoryFilter(category);
+    setTxSubCategoryFilter(subCategory ?? "all");
+    requestAnimationFrame(() =>
+      txCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+    );
+  }
 
   const txCategories = useMemo(
     () => [...new Set(monthTx.map((t) => t.category))].sort(),
@@ -451,7 +474,22 @@ export default function Ledger() {
                             <span className="dot" style={{ background: colorFor(g.category) }} />
                             <b className={over ? "over-budget-label" : ""}>{g.category}</b>
                           </td>
-                          <td className={"right " + (over ? "expense" : "")}>{won(g.actual)}</td>
+                          <td className={"right " + (over ? "expense" : "")}>
+                            {g.category !== "미분류" && g.actual > 0 ? (
+                              <button
+                                className="link-btn amt-link"
+                                title="이 분류의 거래내역 보기"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  showTransactionsOf(g.category, null);
+                                }}
+                              >
+                                {won(g.actual)}
+                              </button>
+                            ) : (
+                              won(g.actual)
+                            )}
+                          </td>
                           <td>
                             {g.budget > 0 ? (
                               <div className="progress">
@@ -469,8 +507,16 @@ export default function Ledger() {
                         {isOpen &&
                           g.rows.map((r) => {
                             const rowOver = r.budget > 0 && r.actual > r.budget;
+                            const canDrill = g.category !== "미분류" && r.actual > 0;
                             return (
-                              <tr key={g.category + "|" + r.subCategory} className="budget-child-row">
+                              <tr
+                                key={g.category + "|" + r.subCategory}
+                                className={"budget-child-row" + (canDrill ? " clickable" : "")}
+                                title={canDrill ? "눌러서 이 항목의 거래내역 보기" : undefined}
+                                onClick={
+                                  canDrill ? () => showTransactionsOf(g.category, r.subCategory) : undefined
+                                }
+                              >
                                 <td className={rowOver ? "over-budget-label" : ""}>{r.subCategory}</td>
                                 <td className={"right " + (rowOver ? "over-budget-label" : "muted")}>
                                   {r.actual > 0 ? won(r.actual) : "—"}
@@ -661,12 +707,24 @@ export default function Ledger() {
             )}
           </section>
 
-          <div className="card">
+          <div className="card tx-card" ref={txCardRef}>
             <h3>
               {ym.replace("-", "년 ")}월 거래내역{" "}
               {filteredTx.length === monthTx.length
                 ? `(${monthTx.length}건)`
                 : `(${filteredTx.length}/${monthTx.length}건)`}
+              {(txCategoryFilter !== "all" || txSubCategoryFilter !== "all") &&
+                filteredTx.some((t) => t.kind === "지출") && (
+                  <span className="muted" style={{ fontSize: 13, fontWeight: 400 }}>
+                    {" "}
+                    · 지출 합계{" "}
+                    {won(
+                      filteredTx
+                        .filter((t) => t.kind === "지출")
+                        .reduce((sum, t) => sum + t.amountKRW, 0)
+                    )}
+                  </span>
+                )}
             </h3>
             {monthTx.length === 0 ? (
               <Empty text="이 달 거래 내역이 없어요." />
