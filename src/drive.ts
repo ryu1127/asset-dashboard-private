@@ -199,3 +199,22 @@ export async function downloadFromDrive(): Promise<string> {
   if (!res.ok) throw new Error("드라이브 불러오기에 실패했습니다.");
   return res.text();
 }
+
+// 로그인한 구글 계정의 이메일. drive.file 범위만으로 읽을 수 있는 about API를 쓰므로 권한을
+// 더 요청하지 않는다. 토큰별로 한 번만 조회하고, 실패하면 null(알 수 없음).
+let emailCache: { token: string; email: string | null } | null = null;
+export async function getAccountEmail(): Promise<string | null> {
+  if (!accessToken) return null;
+  if (emailCache?.token === accessToken) return emailCache.email;
+  let email: string | null = null;
+  try {
+    const res = await fetch("https://www.googleapis.com/drive/v3/about?fields=user(emailAddress)", {
+      headers: authHeaders(),
+    });
+    if (res.ok) email = ((await res.json()).user?.emailAddress as string | undefined)?.toLowerCase() ?? null;
+  } catch {
+    // 네트워크 오류 등: 알 수 없음으로 취급
+  }
+  emailCache = { token: accessToken, email };
+  return email;
+}

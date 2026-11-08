@@ -38,6 +38,8 @@ import {
   yearSummary,
 } from "../sheetCompute";
 import { useSheetData } from "../useSheetData";
+import { PRIVATE_ALLOWED_EMAILS, PRIVATE_CATEGORY } from "../config";
+import { getAccountEmail } from "../drive";
 
 // 파스텔 톤이면서도 색약 구분·명암비 최소 기준을 통과하도록 dataviz 스킬의
 // validate_palette.js로 검증한 카테고리 팔레트 (기준 팔레트를 밝기↑·채도↓로 조정).
@@ -197,10 +199,25 @@ export default function Ledger() {
     [allocation]
   );
 
+  // 대분류가 "용돈"인 거래는 허용된 계정으로 로그인했을 때만 거래내역에 보인다(확인 전·실패 시 숨김).
+  const [accountEmail, setAccountEmail] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    if (signedIn) getAccountEmail().then((e) => alive && setAccountEmail(e));
+    return () => {
+      alive = false;
+    };
+  }, [signedIn]);
+  const canSeePrivate = accountEmail != null && PRIVATE_ALLOWED_EMAILS.includes(accountEmail);
+
   const monthTx = useMemo(
     () =>
-      data ? monthTransactions(data.transactions, ym, memberFilter, members) : [],
-    [data, ym, memberFilter, members]
+      data
+        ? monthTransactions(data.transactions, ym, memberFilter, members).filter(
+            (t) => canSeePrivate || t.category !== PRIVATE_CATEGORY
+          )
+        : [],
+    [data, ym, memberFilter, members, canSeePrivate]
   );
 
   const [txCategoryFilter, setTxCategoryFilter] = useState("all");

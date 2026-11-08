@@ -16,3 +16,8 @@ const LEGACY_SPREADSHEET_IDS = ["1wkwvD4khoI4rMZyiIWALr7Zhoa146jtFKUqhMIybqrc"];
 export function isLegacySpreadsheet(spreadsheetId: string): boolean {
   return LEGACY_SPREADSHEET_IDS.includes(spreadsheetId);
 }
+
+// 이 계정으로 로그인했을 때만 보이는 거래(대분류가 정확히 "용돈")를 허용하는 구글 계정.
+// 화면에서만 가리는 것이라 보안 장치는 아니다(시트를 읽을 수 있는 사람은 시트에서 볼 수 있다).
+export const PRIVATE_ALLOWED_EMAILS = ["ryudonghun78@gmail.com"];
+export const PRIVATE_CATEGORY = "용돈";
